@@ -1024,7 +1024,6 @@
           <div>
             <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:3px">Prices Last Updated</div>
             <div style="font-size:13px;font-weight:500;color:var(--text)" id="home-last-refresh">Never refreshed</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px" id="home-quota-label"></div>
           </div>
           <button onclick="refreshAllPrices()" id="refresh-btn"
             style="display:flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:opacity 0.15s;flex-shrink:0"
@@ -2516,51 +2515,28 @@ function renderHomeKPIs() {
 
 function renderRefreshBar() {
   const refreshEl  = document.getElementById('home-last-refresh');
-  const quotaEl    = document.getElementById('home-quota-label');
   const btn        = document.getElementById('refresh-btn');
   const rateBanner = document.getElementById('rate-limit-banner');
   if (!refreshEl) return;
 
-  const quotaLeft      = getRemainingQuota();
-  const rateLimited    = wasRateLimitedToday();
-  const resetIn        = formatResetTime();
-  const outOfQuota     = quotaLeft < 1 || rateLimited;
+  const rateLimited = wasRateLimitedToday();
 
   // ── Rate-limit banner ──
   if (rateBanner) {
-    if (rateLimited) {
-      rateBanner.style.display = 'flex';
-      // Finnhub rate limit resets per-minute, no countdown needed
-    } else {
-      rateBanner.style.display = 'none';
-    }
+    rateBanner.style.display = rateLimited ? 'flex' : 'none';
   }
 
-  // ── Quota label — color-coded ──
-  if (quotaEl) {
-    if (rateLimited) {
-      quotaEl.style.color = 'var(--red)';
-      quotaEl.textContent = `Rate limit hit · wait a minute and try again`;
-    } else {
-      quotaEl.style.color = 'var(--text3)';
-      const today = new Date().toISOString().split('T')[0];
-      const q = getQuotaToday();
-      const used = q.date === today ? q.used : 0;
-      quotaEl.textContent = used > 0 ? `${used} API calls made today · Finnhub (60/min)` : 'Finnhub · 60 calls/min — no daily limit';
-    }
-  }
-
-  // ── Disable refresh button when out of quota ──
+  // ── Re-enable button (rate limit is per-minute, not per-day) ──
   if (btn) {
-    btn.disabled       = outOfQuota;
-    btn.style.opacity  = outOfQuota ? '0.4' : '1';
-    btn.style.cursor   = outOfQuota ? 'not-allowed' : 'pointer';
+    btn.disabled      = false;
+    btn.style.opacity = '1';
+    btn.style.cursor  = 'pointer';
   }
 
   // ── Last refresh timestamp ──
   if (!state.settings.lastRefresh) {
     refreshEl.textContent = state.settings.apiKey
-      ? 'Tap Refresh to load live prices'
+      ? 'Refreshing prices…'
       : 'Add API key in Settings';
     return;
   }
@@ -3914,11 +3890,20 @@ function init() {
   loadLiveListing();
 
   // Always pull from Sheets on startup to stay in sync across devices.
-  // We do this regardless of whether localStorage has data — Sheets is the source of truth.
+  // syncFromSheets will auto-trigger refreshAllPrices after loading if prices are missing.
   if (state.settings.sheetsUrl) {
-    showToast('Syncing from Google Sheets…', '');
     syncFromSheets();
+  } else if (state.settings.apiKey && state.transactions.length) {
+    // No Sheets configured — just refresh prices directly on open
+    setTimeout(() => refreshAllPrices(), 500);
   }
+
+  // Refresh prices when app comes back to foreground (e.g. switching tabs/apps)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.settings.apiKey && state.transactions.length) {
+      setTimeout(() => refreshAllPrices(), 300);
+    }
+  });
 
   // Close autocomplete on outside click
   document.addEventListener('click', (e) => {
@@ -3934,7 +3919,7 @@ function init() {
     }
   });
 
-  // Tick every minute: updates "X minutes ago" label and rate-limit reset countdown
+  // Tick every minute to keep "X minutes ago" label fresh
   setInterval(() => {
     if (document.getElementById('home-last-refresh')) renderRefreshBar();
   }, 60000);
