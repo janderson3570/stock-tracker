@@ -1,0 +1,2531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stock Tracker">
+<title>Stock Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface2: #f0f0ee;
+    --border: #e8e8e5;
+    --border2: #d8d8d4;
+    --text: #1a1a18;
+    --text2: #6b6b65;
+    --text3: #9b9b93;
+    --accent: #1a1a18;
+    --green: #1a9e5c;
+    --green-bg: #edf7f2;
+    --red: #d63b3b;
+    --red-bg: #fdf0f0;
+    --blue: #2563eb;
+    --blue-bg: #eff4ff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+    --shadow-lg: 0 20px 60px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06);
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-xs: 5px;
+    --tab-height: 72px;
+    --header-height: 56px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    font-family: var(--font);
+    color: var(--text);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: -webkit-fill-available;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* ── HEADER ── */
+  .header {
+    flex-shrink: 0;
+    height: var(--header-height);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    justify-content: space-between;
+    position: relative;
+    z-index: 10;
+  }
+  .header-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+  .header-subtitle {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-top: 1px;
+  }
+  .header-action {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: white;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+    font-weight: 300;
+    line-height: 1;
+  }
+  .header-action:active { transform: scale(0.92); opacity: 0.8; }
+
+  /* ── SCREENS ── */
+  .screen-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .screen {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: none;
+    padding-bottom: 16px;
+  }
+  .screen.active { display: block; }
+
+  /* ── TAB BAR ── */
+  .tab-bar {
+    flex-shrink: 0;
+    height: var(--tab-height);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.15s;
+  }
+  .tab-btn:active { opacity: 0.6; }
+  .tab-icon {
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .tab-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text3);
+    letter-spacing: 0.2px;
+    transition: color 0.15s;
+  }
+  .tab-btn.active .tab-label { color: var(--text); }
+  .tab-btn.active .tab-icon svg { fill: var(--text); }
+  .tab-btn .tab-icon svg { fill: var(--text3); transition: fill 0.15s; }
+
+  /* ── SCROLL CONTENT ── */
+  .page-content {
+    padding: 16px 16px 0;
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+  .kpi-card.full { grid-column: 1 / -1; }
+  .kpi-label {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--mono);
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .kpi-value.positive { color: var(--green); }
+  .kpi-value.negative { color: var(--red); }
+  .kpi-change {
+    font-size: 12px;
+    font-family: var(--mono);
+    margin-top: 3px;
+    font-weight: 500;
+  }
+  .kpi-change.positive { color: var(--green); }
+  .kpi-change.negative { color: var(--red); }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ── TOGGLE ── */
+  .toggle-group {
+    display: flex;
+    background: var(--surface2);
+    border-radius: var(--radius-xs);
+    padding: 2px;
+    gap: 1px;
+  }
+  .toggle-btn {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text3);
+    transition: all 0.15s;
+    font-family: var(--font);
+  }
+  .toggle-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+  }
+
+  /* ── STOCKS TABLE ── */
+  .table-wrap {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .stocks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .stocks-table thead tr {
+    border-bottom: 1px solid var(--border);
+  }
+  .stocks-table th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  .stocks-table th:hover { color: var(--text); }
+  .stocks-table th.sorted { color: var(--text); }
+  .sort-arrow { margin-left: 3px; font-size: 9px; }
+  .stocks-table th.right, .stocks-table td.right { text-align: right; }
+  .stocks-table td {
+    padding: 13px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .stocks-table tbody tr:last-child td { border-bottom: none; }
+  .stocks-table tbody tr {
+    transition: background 0.1s;
+  }
+  .stocks-table tbody tr:active { background: var(--surface2); }
+  .ticker-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ticker-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .ticker-name:active { opacity: 0.7; }
+  .ticker-shares {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+  .price-cell {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .change-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 7px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .change-pill.positive { background: var(--green-bg); color: var(--green); }
+  .change-pill.negative { background: var(--red-bg); color: var(--red); }
+  .change-pill.neutral { background: var(--surface2); color: var(--text3); }
+
+  /* Change period selector */
+  .period-select-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .period-dots {
+    font-size: 10px;
+    color: var(--text3);
+    cursor: pointer;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 50px 20px;
+    text-align: center;
+    color: var(--text3);
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 16px; color: var(--text2); margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; line-height: 1.5; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+    padding-bottom: var(--safe-bottom);
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal {
+    background: var(--surface);
+    border-radius: 22px 22px 0 0;
+    width: 100%;
+    max-width: 500px;
+    padding: 20px 20px 32px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-overlay.open .modal {
+    transform: translateY(0);
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  /* ── FORM ── */
+  .form-group {
+    margin-bottom: 14px;
+  }
+  .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-family: var(--font);
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text3); }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .form-type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .type-btn {
+    padding: 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font);
+    color: var(--text2);
+  }
+  .type-btn.buy.active {
+    background: var(--green-bg);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .type-btn.sell.active {
+    background: var(--red-bg);
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  /* Autocomplete dropdown */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 200;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+  }
+  .autocomplete-list.show { display: block; }
+  .autocomplete-item {
+    padding: 11px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:active { background: var(--surface2); }
+  .autocomplete-ticker { font-weight: 600; font-size: 14px; }
+  .autocomplete-name { font-size: 12px; color: var(--text3); margin-top: 1px; }
+
+  /* ── BUTTON ── */
+  .btn-primary {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.15s;
+    margin-top: 8px;
+  }
+  .btn-primary:active { opacity: 0.85; transform: scale(0.99); }
+  .btn-secondary {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.15s;
+  }
+  .btn-secondary:active { background: var(--surface2); }
+  .btn-danger {
+    background: var(--red-bg);
+    color: var(--red);
+    border-color: var(--red);
+  }
+
+  /* ── STOCK DETAIL SCREEN ── */
+  .stock-detail-header {
+    padding: 16px 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    transition: all 0.15s;
+  }
+  .back-btn:active { background: var(--surface2); }
+  .stock-detail-info {}
+  .stock-detail-ticker {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .stock-detail-company {
+    font-size: 13px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+  .stock-detail-price {
+    margin-left: auto;
+    text-align: right;
+  }
+  .stock-detail-price-val {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--mono);
+    letter-spacing: -0.5px;
+  }
+  .stock-detail-price-change {
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .stock-detail-price-change.positive { color: var(--green); }
+  .stock-detail-price-change.negative { color: var(--red); }
+
+  /* ── CHART ── */
+  .chart-wrap {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin: 0 16px 16px;
+    padding: 16px 0 10px;
+    overflow: hidden;
+  }
+  .chart-period-bar {
+    display: flex;
+    gap: 2px;
+    padding: 0 12px 12px;
+    overflow-x: auto;
+  }
+  .chart-period-btn {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .chart-period-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+  #chart-canvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+  }
+  .chart-tooltip {
+    position: absolute;
+    background: var(--text);
+    color: white;
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 5px 8px;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    white-space: nowrap;
+    z-index: 50;
+  }
+
+  /* ── TRANSACTIONS ── */
+  .transaction-list {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .transaction-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .tx-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tx-dot.buy { background: var(--green); }
+  .tx-dot.sell { background: var(--red); }
+  .tx-info { flex: 1; }
+  .tx-main {
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .tx-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .tx-badge.buy { background: var(--green-bg); color: var(--green); }
+  .tx-badge.sell { background: var(--red-bg); color: var(--red); }
+  .tx-sub {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 3px;
+    font-family: var(--mono);
+  }
+  .tx-amount {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .tx-amount.positive { color: var(--green); }
+  .tx-amount.negative { color: var(--red); }
+  .tx-edit-btn {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .tx-edit-btn:active { background: var(--border); }
+
+  /* ── SETTINGS ── */
+  .settings-section {
+    margin: 0 16px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .settings-section-title {
+    padding: 14px 16px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-label { font-size: 14px; font-weight: 500; }
+  .settings-row-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .settings-btn {
+    padding: 8px 14px;
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .settings-btn:active { opacity: 0.75; }
+  .settings-btn.primary { background: var(--accent); color: white; }
+  .settings-btn.outline { background: transparent; border: 1.5px solid var(--border2); color: var(--text); }
+  .settings-btn.danger { background: var(--red-bg); color: var(--red); }
+  .settings-input-full {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .settings-input-full:focus { border-color: var(--accent); }
+  .step-list {
+    padding: 14px 16px;
+  }
+  .step-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .step-item:last-child { margin-bottom: 0; }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-content {}
+  .step-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .step-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .step-code {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text);
+    margin-top: 6px;
+    word-break: break-all;
+    line-height: 1.6;
+  }
+  .sync-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text3);
+  }
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+  .sync-dot.connected { background: var(--green); }
+  .sync-dot.syncing { background: var(--blue); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  /* ── LOADING ── */
+  .price-loading {
+    display: inline-block;
+    width: 40px; height: 10px;
+    background: linear-gradient(90deg, var(--border) 25%, var(--border2) 50%, var(--border) 75%);
+    background-size: 200%;
+    border-radius: 3px;
+    animation: shimmer 1.2s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    top: calc(var(--safe-top) + 60px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: var(--text);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 999;
+    opacity: 0;
+    transition: all 0.25s;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+
+  /* ── PERIOD CHANGE BAR ── */
+  .change-period-bar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .change-period-mini {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.15s;
+  }
+  .change-period-mini.active {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  /* Misc */
+  .divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .text-center { text-align: center; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .color-green { color: var(--green); }
+  .color-red { color: var(--red); }
+
+  .detail-info-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin: 0 16px 16px;
+    overflow: hidden;
+  }
+  .detail-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-info-row:last-child { border-bottom: none; }
+  .detail-info-label { font-size: 13px; color: var(--text3); }
+  .detail-info-val { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text3);
+    padding: 0 16px;
+    margin-bottom: 10px;
+    margin-top: 4px;
+  }
+
+  /* Alert/confirm */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .confirm-overlay.open { opacity: 1; pointer-events: all; }
+  .confirm-box {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.95);
+    transition: transform 0.2s;
+  }
+  .confirm-overlay.open .confirm-box { transform: scale(1); }
+  .confirm-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .confirm-msg { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 20px; }
+  .confirm-actions { display: flex; gap: 8px; }
+  .confirm-actions button {
+    flex: 1; padding: 12px; border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 600; border: none;
+    cursor: pointer; font-family: var(--font); transition: opacity 0.15s;
+  }
+  .confirm-actions button:active { opacity: 0.8; }
+  .confirm-cancel { background: var(--surface2); color: var(--text); }
+  .confirm-ok { background: var(--accent); color: white; }
+  .confirm-ok.danger { background: var(--red); }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div class="header" id="main-header">
+    <div>
+      <div class="header-title" id="header-title">Portfolio</div>
+      <div class="header-subtitle" id="header-subtitle" style="display:none"></div>
+    </div>
+    <button class="header-action" id="add-btn" onclick="openAddModal()" title="Add Transaction">+</button>
+  </div>
+
+  <!-- SCREENS -->
+  <div class="screen-container">
+
+    <!-- HOME SCREEN -->
+    <div class="screen active" id="screen-home">
+      <div class="page-content">
+        <!-- KPIs -->
+        <div class="kpi-grid" id="home-kpis">
+          <div class="kpi-card full">
+            <div class="kpi-label">Total Portfolio Value</div>
+            <div class="kpi-value" id="kpi-total-value">—</div>
+            <div class="kpi-change" id="kpi-total-change"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Total Invested</div>
+            <div class="kpi-value" id="kpi-invested">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Unrealized P&L</div>
+            <div class="kpi-value" id="kpi-unrealized">—</div>
+            <div class="kpi-change" id="kpi-unrealized-pct"></div>
+          </div>
+          <div class="kpi-card full">
+            <div class="kpi-label">Realized Gains (Sold)</div>
+            <div class="kpi-value" id="kpi-realized">—</div>
+          </div>
+        </div>
+
+        <!-- Holdings Table -->
+        <div class="section-header">
+          <div class="section-title">Holdings</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="change-period-bar">
+              <button class="change-period-mini active" data-period="1d" onclick="setChangePeriod('1d',this)">1D</button>
+              <button class="change-period-mini" data-period="1w" onclick="setChangePeriod('1w',this)">1W</button>
+              <button class="change-period-mini" data-period="1m" onclick="setChangePeriod('1m',this)">1M</button>
+              <button class="change-period-mini" data-period="1y" onclick="setChangePeriod('1y',this)">1Y</button>
+            </div>
+            <div class="toggle-group">
+              <button class="toggle-btn active" onclick="setViewMode('total',this)">$</button>
+              <button class="toggle-btn" onclick="setViewMode('per',this)">/ share</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 0 16px 0">
+        <div class="table-wrap">
+          <table class="stocks-table" id="holdings-table">
+            <thead>
+              <tr id="table-head-row"></tr>
+            </thead>
+            <tbody id="holdings-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL SCREEN -->
+    <div class="screen" id="screen-detail">
+      <div class="stock-detail-header" id="detail-header"></div>
+      <div class="kpi-grid" style="padding:0 16px;margin-bottom:16px" id="detail-kpis"></div>
+      <div class="chart-wrap" id="detail-chart-wrap">
+        <div class="chart-period-bar" id="chart-periods"></div>
+        <canvas id="chart-canvas"></canvas>
+      </div>
+      <p class="section-label">Stock Details</p>
+      <div class="detail-info-card" id="detail-info-card"></div>
+      <p class="section-label mt16">Purchase History</p>
+      <div class="transaction-list" id="detail-tx-list"></div>
+    </div>
+
+    <!-- HISTORY SCREEN -->
+    <div class="screen" id="screen-history">
+      <div class="page-content">
+        <div class="section-header">
+          <div class="section-title">All Transactions</div>
+          <div id="history-count" style="font-size:12px;color:var(--text3)"></div>
+        </div>
+      </div>
+      <div class="transaction-list" id="history-list"></div>
+    </div>
+
+    <!-- SETTINGS SCREEN -->
+    <div class="screen" id="screen-settings">
+      <div class="page-content">
+        <div class="section-header">
+          <div class="section-title">Settings</div>
+        </div>
+      </div>
+
+      <!-- Sync Status -->
+      <div class="settings-section">
+        <div class="settings-section-title">Google Sheets Sync</div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Connection Status</div>
+            <div class="sync-status mt8" id="sync-status-row">
+              <div class="sync-dot" id="sync-dot"></div>
+              <span id="sync-status-text">Not configured</span>
+            </div>
+          </div>
+          <button class="settings-btn primary" onclick="syncNow()">Sync Now</button>
+        </div>
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="settings-row-label">Apps Script URL</div>
+          <input class="settings-input-full" id="sheets-url-input" type="url"
+            placeholder="https://script.google.com/macros/s/.../exec"
+            oninput="saveSheetUrl()">
+          <div style="font-size:11px;color:var(--text3)">Paste your deployed Apps Script web app URL here</div>
+        </div>
+      </div>
+
+      <!-- Setup Guide -->
+      <div class="settings-section">
+        <div class="settings-section-title">📋 Google Sheets Setup Guide</div>
+        <div class="step-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Create a new Google Sheet</div>
+              <div class="step-desc">Go to sheets.google.com and create a new spreadsheet. Name it "Stock Tracker" or anything you like.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Open Apps Script</div>
+              <div class="step-desc">In your Sheet, click <strong>Extensions → Apps Script</strong>. Delete any existing code in the editor.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Paste the Apps Script code</div>
+              <div class="step-desc">Copy the entire code below and paste it into the Apps Script editor, then click Save (💾).</div>
+              <div class="step-code" id="apps-script-code-display" style="cursor:pointer" onclick="copyAppsScript()">
+                <em>Tap to copy the Apps Script code →</em>
+              </div>
+              <button class="settings-btn outline mt8" onclick="copyAppsScript()" style="width:100%">📋 Copy Apps Script Code</button>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Deploy as Web App</div>
+              <div class="step-desc">Click <strong>Deploy → New deployment</strong>. Set type to <strong>Web app</strong>. Set "Execute as" to <strong>Me</strong> and "Who has access" to <strong>Anyone</strong>. Click Deploy and copy the URL.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">Authorize & paste URL</div>
+              <div class="step-desc">Authorize the app when prompted (click "Advanced" → "Go to…" if needed). Paste the deployment URL into the field above, then tap <strong>Sync Now</strong>.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <div class="step-title">Stock prices (Alpha Vantage)</div>
+              <div class="step-desc">For live prices, get a free API key at <strong>alphavantage.co/support/#api-key</strong> and paste it below. Free tier gives 25 requests/day.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Key -->
+      <div class="settings-section">
+        <div class="settings-section-title">Live Stock Prices</div>
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="settings-row-label">Alpha Vantage API Key</div>
+          <input class="settings-input-full" id="av-api-key" type="text"
+            placeholder="Your free API key from alphavantage.co"
+            oninput="saveApiKey()">
+          <div style="font-size:11px;color:var(--text3)">Free: 25 requests/day. Prices refresh when you open the app.</div>
+        </div>
+        <div class="settings-row" style="justify-content:space-between">
+          <div>
+            <div class="settings-row-label">Last Price Refresh</div>
+            <div id="last-refresh-time" style="font-size:12px;color:var(--text3);margin-top:2px">Never</div>
+          </div>
+          <button class="settings-btn outline" onclick="refreshAllPrices()">Refresh Prices</button>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="settings-section">
+        <div class="settings-section-title">Data</div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Export Data</div>
+            <div class="settings-row-sub">Download transactions as JSON</div>
+          </div>
+          <button class="settings-btn outline" onclick="exportData()">Export</button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Import Data</div>
+            <div class="settings-row-sub">Load from JSON backup</div>
+          </div>
+          <button class="settings-btn outline" onclick="document.getElementById('import-file').click()">Import</button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Clear All Data</div>
+            <div class="settings-row-sub">Cannot be undone</div>
+          </div>
+          <button class="settings-btn danger" onclick="confirmClearData()">Clear</button>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div>
+
+  </div><!-- end screen-container -->
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-home" onclick="navigate('home')">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div class="tab-label">Portfolio</div>
+    </button>
+    <button class="tab-btn" id="tab-detail" onclick="navigate('detail')" style="display:none">
+      <div class="tab-icon">📈</div>
+      <div class="tab-label" id="tab-detail-label">Stock</div>
+    </button>
+    <button class="tab-btn" id="tab-history" onclick="navigate('history')">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <div class="tab-label">History</div>
+    </button>
+    <button class="tab-btn" id="tab-settings" onclick="navigate('settings')">
+      <div class="tab-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </div>
+      <div class="tab-label">Settings</div>
+    </button>
+  </div>
+</div>
+
+<!-- ADD TRANSACTION MODAL -->
+<div class="modal-overlay" id="add-modal-overlay" onclick="closeModalOnOverlay(event,'add-modal-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="add-modal-title">Add Transaction</div>
+    <div class="form-type-toggle">
+      <button class="type-btn buy active" id="type-buy" onclick="setTxType('buy')">📈 Buy</button>
+      <button class="type-btn sell" id="type-sell" onclick="setTxType('sell')">📉 Sell</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ticker Symbol</label>
+      <div class="autocomplete-wrap">
+        <input class="form-input" id="tx-ticker" placeholder="e.g. AAPL" autocomplete="off" autocapitalize="characters"
+          oninput="onTickerInput(this.value)" onfocus="onTickerInput(this.value)">
+        <div class="autocomplete-list" id="autocomplete-list"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Shares</label>
+        <input class="form-input" id="tx-shares" type="number" placeholder="0" min="0" step="any" inputmode="decimal">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price / Share</label>
+        <input class="form-input" id="tx-price" type="number" placeholder="0.00" min="0" step="any" inputmode="decimal">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input class="form-input" id="tx-date" type="date">
+    </div>
+    <div id="tx-total-preview" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-size:13px;color:var(--text2);display:none">
+      Total: <strong id="tx-total-val"></strong>
+    </div>
+    <button class="btn-primary" id="save-tx-btn" onclick="saveTransaction()">Save Transaction</button>
+    <button class="btn-secondary" onclick="closeModal('add-modal-overlay')">Cancel</button>
+  </div>
+</div>
+
+<!-- EDIT TRANSACTION MODAL -->
+<div class="modal-overlay" id="edit-modal-overlay" onclick="closeModalOnOverlay(event,'edit-modal-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Edit Transaction</div>
+    <input type="hidden" id="edit-tx-id">
+    <div class="form-type-toggle">
+      <button class="type-btn buy" id="edit-type-buy" onclick="setEditTxType('buy')">📈 Buy</button>
+      <button class="type-btn sell" id="edit-type-sell" onclick="setEditTxType('sell')">📉 Sell</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ticker Symbol</label>
+      <input class="form-input" id="edit-ticker" readonly style="background:var(--surface2);color:var(--text3)">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Shares</label>
+        <input class="form-input" id="edit-shares" type="number" placeholder="0" min="0" step="any" inputmode="decimal">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price / Share</label>
+        <input class="form-input" id="edit-price" type="number" placeholder="0.00" min="0" step="any" inputmode="decimal">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input class="form-input" id="edit-date" type="date">
+    </div>
+    <button class="btn-primary" onclick="saveEditTransaction()">Save Changes</button>
+    <button class="btn-secondary btn-danger" onclick="confirmDeleteTransaction()">Delete Transaction</button>
+    <button class="btn-secondary" onclick="closeModal('edit-modal-overlay')">Cancel</button>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Are you sure?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-ok" id="confirm-ok-btn" onclick="runConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHART TOOLTIP -->
+<div class="chart-tooltip" id="chart-tooltip"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STOCK DATABASE (common tickers for autocomplete)
+// ═══════════════════════════════════════════════════════════════
+const STOCK_DB = [
+  {t:'AAPL',n:'Apple Inc.'},
+  {t:'MSFT',n:'Microsoft Corporation'},
+  {t:'GOOGL',n:'Alphabet Inc. (Class A)'},
+  {t:'GOOG',n:'Alphabet Inc. (Class C)'},
+  {t:'AMZN',n:'Amazon.com Inc.'},
+  {t:'NVDA',n:'NVIDIA Corporation'},
+  {t:'META',n:'Meta Platforms Inc.'},
+  {t:'TSLA',n:'Tesla Inc.'},
+  {t:'BRK.B',n:'Berkshire Hathaway Inc.'},
+  {t:'LLY',n:'Eli Lilly and Company'},
+  {t:'JPM',n:'JPMorgan Chase & Co.'},
+  {t:'V',n:'Visa Inc.'},
+  {t:'XOM',n:'Exxon Mobil Corporation'},
+  {t:'UNH',n:'UnitedHealth Group Inc.'},
+  {t:'JNJ',n:'Johnson & Johnson'},
+  {t:'WMT',n:'Walmart Inc.'},
+  {t:'MA',n:'Mastercard Inc.'},
+  {t:'PG',n:'Procter & Gamble Co.'},
+  {t:'AVGO',n:'Broadcom Inc.'},
+  {t:'HD',n:'The Home Depot Inc.'},
+  {t:'CVX',n:'Chevron Corporation'},
+  {t:'MRK',n:'Merck & Co. Inc.'},
+  {t:'ABBV',n:'AbbVie Inc.'},
+  {t:'COST',n:'Costco Wholesale Corporation'},
+  {t:'ORCL',n:'Oracle Corporation'},
+  {t:'AMD',n:'Advanced Micro Devices Inc.'},
+  {t:'NFLX',n:'Netflix Inc.'},
+  {t:'ADBE',n:'Adobe Inc.'},
+  {t:'CRM',n:'Salesforce Inc.'},
+  {t:'INTC',n:'Intel Corporation'},
+  {t:'QCOM',n:'Qualcomm Inc.'},
+  {t:'TXN',n:'Texas Instruments Inc.'},
+  {t:'INTU',n:'Intuit Inc.'},
+  {t:'PFE',n:'Pfizer Inc.'},
+  {t:'BA',n:'Boeing Company'},
+  {t:'CAT',n:'Caterpillar Inc.'},
+  {t:'GS',n:'Goldman Sachs Group Inc.'},
+  {t:'MS',n:'Morgan Stanley'},
+  {t:'AMGN',n:'Amgen Inc.'},
+  {t:'SBUX',n:'Starbucks Corporation'},
+  {t:'IBM',n:'International Business Machines'},
+  {t:'GE',n:'GE Aerospace'},
+  {t:'DIS',n:'The Walt Disney Company'},
+  {t:'T',n:'AT&T Inc.'},
+  {t:'VZ',n:'Verizon Communications Inc.'},
+  {t:'KO',n:'The Coca-Cola Company'},
+  {t:'PEP',n:'PepsiCo Inc.'},
+  {t:'MCD',n:'McDonald\'s Corporation'},
+  {t:'NKE',n:'Nike Inc.'},
+  {t:'UBER',n:'Uber Technologies Inc.'},
+  {t:'LYFT',n:'Lyft Inc.'},
+  {t:'ABNB',n:'Airbnb Inc.'},
+  {t:'SNAP',n:'Snap Inc.'},
+  {t:'SPOT',n:'Spotify Technology SA'},
+  {t:'PYPL',n:'PayPal Holdings Inc.'},
+  {t:'SQ',n:'Block Inc.'},
+  {t:'COIN',n:'Coinbase Global Inc.'},
+  {t:'PLTR',n:'Palantir Technologies Inc.'},
+  {t:'RBLX',n:'Roblox Corporation'},
+  {t:'HOOD',n:'Robinhood Markets Inc.'},
+  {t:'RIVN',n:'Rivian Automotive Inc.'},
+  {t:'LCID',n:'Lucid Group Inc.'},
+  {t:'F',n:'Ford Motor Company'},
+  {t:'GM',n:'General Motors Company'},
+  {t:'SPY',n:'SPDR S&P 500 ETF Trust'},
+  {t:'QQQ',n:'Invesco QQQ Trust'},
+  {t:'IWM',n:'iShares Russell 2000 ETF'},
+  {t:'VTI',n:'Vanguard Total Stock Market ETF'},
+  {t:'VOO',n:'Vanguard S&P 500 ETF'},
+  {t:'VGT',n:'Vanguard Information Technology ETF'},
+  {t:'ARKK',n:'ARK Innovation ETF'},
+  {t:'GLD',n:'SPDR Gold Shares'},
+  {t:'SLV',n:'iShares Silver Trust'},
+  {t:'BTC',n:'Bitcoin'},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let state = {
+  transactions: [], // {id, ticker, type:'buy'|'sell', shares, price, date, timestamp}
+  prices: {},       // {TICKER: {price, prevClose, open, week52H, week52L, mktCap, pe, name}}
+  settings: {
+    sheetsUrl: '',
+    apiKey: '',
+    lastRefresh: null
+  }
+};
+
+let viewMode = 'total'; // 'total' | 'per'
+let changePeriod = '1d';
+let sortCol = 'ticker';
+let sortDir = 1;
+let currentDetailTicker = null;
+let currentEditId = null;
+let confirmCallback = null;
+let currentTxType = 'buy';
+let editTxType = 'buy';
+let chartData = null;
+let chartPeriod = '1M';
+
+// ═══════════════════════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function save() {
+  localStorage.setItem('st_transactions', JSON.stringify(state.transactions));
+  localStorage.setItem('st_prices', JSON.stringify(state.prices));
+  localStorage.setItem('st_settings', JSON.stringify(state.settings));
+}
+
+function load() {
+  try {
+    const tx = localStorage.getItem('st_transactions');
+    const pr = localStorage.getItem('st_prices');
+    const se = localStorage.getItem('st_settings');
+    if (tx) state.transactions = JSON.parse(tx);
+    if (pr) state.prices = JSON.parse(pr);
+    if (se) state.settings = { ...state.settings, ...JSON.parse(se) };
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FORMATTING
+// ═══════════════════════════════════════════════════════════════
+function fmt$(n, dec=2) {
+  if (n == null || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  const str = abs.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+  return (n < 0 ? '-' : '') + '$' + str;
+}
+function fmt$K(n) {
+  if (n == null || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return fmt$(n/1e12, 2) + 'T';
+  if (abs >= 1e9) return fmt$(n/1e9, 2) + 'B';
+  if (abs >= 1e6) return fmt$(n/1e6, 2) + 'M';
+  return fmt$(n, 0);
+}
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '—';
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+}
+function fmtNum(n, dec=4) {
+  if (n == null || isNaN(n)) return '—';
+  return n.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: dec});
+}
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+function signClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
+function signStr(n, prefix='') {
+  if (n == null || isNaN(n)) return '';
+  return (n >= 0 ? '+' : '') + prefix;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOLDINGS COMPUTATION
+// ═══════════════════════════════════════════════════════════════
+function getHoldings() {
+  // Group transactions by ticker
+  const map = {};
+  for (const tx of state.transactions) {
+    if (!map[tx.ticker]) map[tx.ticker] = {buys:[], sells:[]};
+    if (tx.type === 'buy') map[tx.ticker].buys.push(tx);
+    else map[tx.ticker].sells.push(tx);
+  }
+
+  const holdings = [];
+  for (const [ticker, {buys, sells}] of Object.entries(map)) {
+    const totalBuyShares = buys.reduce((s,t) => s + t.shares, 0);
+    const totalSellShares = sells.reduce((s,t) => s + t.shares, 0);
+    const currentShares = totalBuyShares - totalSellShares;
+
+    if (currentShares <= 0.0001) continue; // fully sold
+
+    // Weighted average cost
+    const totalCost = buys.reduce((s,t) => s + t.shares * t.price, 0);
+    const avgCost = totalCost / totalBuyShares;
+
+    // Total invested (cash out for what you still hold, using FIFO-ish: just total buy cost)
+    const totalInvested = buys.reduce((s,t) => s + t.shares * t.price, 0);
+    // Simpler: total cash spent on buys that represent current position
+    // Use weighted avg × current shares for "cost basis of current position"
+    const costBasis = avgCost * currentShares;
+
+    const priceData = state.prices[ticker];
+    const currentPrice = priceData?.price;
+    const currentValue = currentPrice ? currentShares * currentPrice : null;
+    const unrealized = currentValue != null ? currentValue - costBasis : null;
+    const unrealizedPct = unrealized != null && costBasis > 0 ? (unrealized / costBasis) * 100 : null;
+
+    // Realized gains from sells
+    let realizedGain = 0;
+    let remainingBuys = buys.map(b => ({...b, remaining: b.shares}));
+    for (const sell of sells) {
+      let toSell = sell.shares;
+      for (const buy of remainingBuys) {
+        if (buy.remaining <= 0) continue;
+        const matched = Math.min(buy.remaining, toSell);
+        realizedGain += matched * (sell.price - buy.price);
+        buy.remaining -= matched;
+        toSell -= matched;
+        if (toSell <= 0) break;
+      }
+    }
+
+    holdings.push({
+      ticker,
+      name: priceData?.name || STOCK_DB.find(s=>s.t===ticker)?.n || ticker,
+      shares: currentShares,
+      avgCost,
+      costBasis,
+      currentPrice,
+      currentValue,
+      unrealized,
+      unrealizedPct,
+      realizedGain,
+      totalInvested,
+      priceData
+    });
+  }
+  return holdings;
+}
+
+function getPortfolioKPIs() {
+  const holdings = getHoldings();
+  const totalValue = holdings.reduce((s,h) => s + (h.currentValue || h.costBasis), 0);
+  const totalInvested = holdings.reduce((s,h) => s + h.costBasis, 0);
+  const unrealized = holdings.reduce((s,h) => s + (h.unrealized || 0), 0);
+  
+  // All-time realized from ALL transactions including fully sold
+  let allRealized = 0;
+  const allTickers = [...new Set(state.transactions.map(t=>t.ticker))];
+  for (const ticker of allTickers) {
+    const buys = state.transactions.filter(t=>t.ticker===ticker && t.type==='buy');
+    const sells = state.transactions.filter(t=>t.ticker===ticker && t.type==='sell');
+    let rb = buys.map(b=>({...b, remaining: b.shares}));
+    for (const sell of sells) {
+      let toSell = sell.shares;
+      for (const buy of rb) {
+        if (buy.remaining <= 0) continue;
+        const matched = Math.min(buy.remaining, toSell);
+        allRealized += matched * (sell.price - buy.price);
+        buy.remaining -= matched;
+        toSell -= matched;
+        if (toSell <= 0) break;
+      }
+    }
+  }
+
+  return { totalValue, totalInvested, unrealized, allRealized,
+    unrealizedPct: totalInvested > 0 ? (unrealized/totalInvested)*100 : 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRICE DATA
+// ═══════════════════════════════════════════════════════════════
+// Primary: Alpha Vantage; fallback: Yahoo Finance via proxy-less approach
+// Since we can't reliably CORS-proxy Yahoo, we use Alpha Vantage + demo fallback
+
+async function fetchPrice(ticker) {
+  const key = state.settings.apiKey;
+  if (!key) return null;
+
+  try {
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    const q = data['Global Quote'];
+    if (!q || !q['05. price']) return null;
+
+    const prevClose = parseFloat(q['08. previous close']);
+    const price = parseFloat(q['05. price']);
+    const changeAmt = parseFloat(q['09. change']);
+    const changePct = parseFloat(q['10. change percent']);
+
+    return {
+      price,
+      prevClose,
+      change1d: changeAmt,
+      changePct1d: isNaN(changePct) ? ((price-prevClose)/prevClose*100) : changePct,
+      open: parseFloat(q['02. open']),
+      high: parseFloat(q['03. high']),
+      low: parseFloat(q['04. low']),
+      volume: parseInt(q['06. volume']),
+      name: STOCK_DB.find(s=>s.t===ticker)?.n || ticker
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
+async function fetchHistoricalPrices(ticker, period) {
+  const key = state.settings.apiKey;
+  if (!key) return generateMockChart(ticker, period);
+
+  try {
+    const fn = (period === '1D' || period === '1W') ? 'TIME_SERIES_DAILY' : 
+                period === '5Y' ? 'TIME_SERIES_WEEKLY' : 'TIME_SERIES_DAILY';
+    const url = `https://www.alphavantage.co/query?function=${fn}&symbol=${ticker}&apikey=${key}&outputsize=full`;
+    const r = await fetch(url);
+    const data = await r.json();
+    
+    const series = data['Time Series (Daily)'] || data['Weekly Time Series'];
+    if (!series) return generateMockChart(ticker, period);
+
+    const now = new Date();
+    let cutoff = new Date();
+    if (period === '1D') cutoff.setDate(now.getDate() - 1);
+    else if (period === '1W') cutoff.setDate(now.getDate() - 7);
+    else if (period === '1M') cutoff.setMonth(now.getMonth() - 1);
+    else if (period === '3M') cutoff.setMonth(now.getMonth() - 3);
+    else if (period === '6M') cutoff.setMonth(now.getMonth() - 6);
+    else if (period === '1Y') cutoff.setFullYear(now.getFullYear() - 1);
+    else cutoff.setFullYear(now.getFullYear() - 5);
+
+    const points = [];
+    for (const [dateStr, vals] of Object.entries(series)) {
+      const d = new Date(dateStr);
+      if (d >= cutoff) {
+        points.push({ date: dateStr, price: parseFloat(vals['4. close']) });
+      }
+    }
+    points.sort((a,b) => a.date.localeCompare(b.date));
+    return points;
+  } catch(e) {
+    return generateMockChart(ticker, period);
+  }
+}
+
+function generateMockChart(ticker, period) {
+  // Generate plausible mock data based on current price
+  const basePrice = state.prices[ticker]?.price || 100;
+  const days = period === '1D' ? 1 : period === '1W' ? 7 :
+               period === '1M' ? 30 : period === '3M' ? 90 :
+               period === '6M' ? 180 : period === '1Y' ? 365 : 1825;
+  const points = [];
+  let price = basePrice * (0.7 + Math.random() * 0.4);
+  const now = new Date();
+  for (let i = days; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    price *= (1 + (Math.random() - 0.48) * 0.025);
+    price = Math.max(price, 0.01);
+    points.push({ date: d.toISOString().split('T')[0], price: +price.toFixed(2) });
+  }
+  // Ensure last point matches current price
+  if (points.length) points[points.length-1].price = basePrice;
+  return points;
+}
+
+async function refreshAllPrices() {
+  const tickers = [...new Set(state.transactions.map(t=>t.ticker))];
+  if (!tickers.length) { showToast('No stocks to refresh', 'error'); return; }
+  if (!state.settings.apiKey) { showToast('Add API key in Settings first', 'error'); return; }
+
+  showToast('Refreshing prices…', '');
+  let updated = 0;
+  for (const ticker of tickers) {
+    const data = await fetchPrice(ticker);
+    if (data) {
+      state.prices[ticker] = { ...state.prices[ticker], ...data };
+      updated++;
+    }
+    await new Promise(r => setTimeout(r, 300)); // rate limit
+  }
+  state.settings.lastRefresh = new Date().toISOString();
+  save();
+  renderHome();
+  renderSettings();
+  showToast(`Updated ${updated}/${tickers.length} prices`, 'success');
+}
+
+// Change % by period
+function getPriceChange(ticker, period) {
+  const p = state.prices[ticker];
+  if (!p || !p.price) return null;
+  
+  if (period === '1d') {
+    return { amt: p.change1d, pct: p.changePct1d };
+  }
+  // For other periods we'd need historical — show N/A if no data
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function navigate(screen, ticker) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  
+  document.getElementById(`screen-${screen}`).classList.add('active');
+  
+  const addBtn = document.getElementById('add-btn');
+  
+  if (screen === 'home') {
+    document.getElementById('tab-home').classList.add('active');
+    document.getElementById('header-title').textContent = 'Portfolio';
+    document.getElementById('header-subtitle').style.display = 'none';
+    addBtn.style.display = 'flex';
+    renderHome();
+  } else if (screen === 'detail') {
+    currentDetailTicker = ticker;
+    document.getElementById('tab-detail').style.display = 'flex';
+    document.getElementById('tab-detail').classList.add('active');
+    document.getElementById('tab-detail-label').textContent = ticker;
+    document.getElementById('header-title').textContent = ticker;
+    const p = state.prices[ticker];
+    document.getElementById('header-subtitle').textContent = p?.name || STOCK_DB.find(s=>s.t===ticker)?.n || '';
+    document.getElementById('header-subtitle').style.display = 'block';
+    addBtn.style.display = 'none';
+    renderDetail(ticker);
+  } else if (screen === 'history') {
+    document.getElementById('tab-history').classList.add('active');
+    document.getElementById('header-title').textContent = 'History';
+    document.getElementById('header-subtitle').style.display = 'none';
+    addBtn.style.display = 'flex';
+    renderHistory();
+  } else if (screen === 'settings') {
+    document.getElementById('tab-settings').classList.add('active');
+    document.getElementById('header-title').textContent = 'Settings';
+    document.getElementById('header-subtitle').style.display = 'none';
+    addBtn.style.display = 'none';
+    renderSettings();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER HOME
+// ═══════════════════════════════════════════════════════════════
+function setViewMode(mode, btn) {
+  viewMode = mode;
+  document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHoldingsTable();
+}
+
+function setChangePeriod(p, btn) {
+  changePeriod = p;
+  document.querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHoldingsTable();
+}
+
+function renderHome() {
+  renderHomeKPIs();
+  renderHoldingsTable();
+}
+
+function renderHomeKPIs() {
+  const kpis = getPortfolioKPIs();
+  
+  const tvEl = document.getElementById('kpi-total-value');
+  tvEl.textContent = fmt$(kpis.totalValue);
+  tvEl.className = 'kpi-value';
+
+  const tcEl = document.getElementById('kpi-total-change');
+  const unrealAmt = kpis.unrealized;
+  const unrealPct = kpis.unrealizedPct;
+  tcEl.textContent = unrealAmt !== 0 ? `${signStr(unrealAmt)}${fmt$(unrealAmt)} (${fmtPct(unrealPct)}) unrealized` : '';
+  tcEl.className = 'kpi-change ' + signClass(unrealAmt);
+
+  document.getElementById('kpi-invested').textContent = fmt$(kpis.totalInvested);
+
+  const urEl = document.getElementById('kpi-unrealized');
+  urEl.textContent = fmt$(kpis.unrealized);
+  urEl.className = 'kpi-value ' + signClass(kpis.unrealized);
+
+  const urPEl = document.getElementById('kpi-unrealized-pct');
+  urPEl.textContent = fmtPct(kpis.unrealizedPct);
+  urPEl.className = 'kpi-change ' + signClass(kpis.unrealized);
+
+  const rzEl = document.getElementById('kpi-realized');
+  rzEl.textContent = fmt$(kpis.allRealized);
+  rzEl.className = 'kpi-value ' + signClass(kpis.allRealized);
+}
+
+function renderHoldingsTable() {
+  const holdings = getHoldings();
+  const thead = document.getElementById('table-head-row');
+  const tbody = document.getElementById('holdings-body');
+
+  if (!holdings.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:0">
+      <div class="empty-state">
+        <div class="icon">📊</div>
+        <h3>No holdings yet</h3>
+        <p>Tap + to add your first stock purchase</p>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  // Define columns based on viewMode
+  const isTotal = viewMode === 'total';
+  const cols = isTotal ? [
+    {key:'ticker', label:'Ticker', sortable:true},
+    {key:'currentValue', label:'Value', sortable:true, right:true},
+    {key:'costBasis', label:'Invested', sortable:true, right:true},
+    {key:'unrealized', label:'P&L', sortable:true, right:true},
+    {key:'change', label:'Change', sortable:false, right:true},
+  ] : [
+    {key:'ticker', label:'Ticker', sortable:true},
+    {key:'shares', label:'Shares', sortable:true, right:true},
+    {key:'avgCost', label:'Avg Cost', sortable:true, right:true},
+    {key:'currentPrice', label:'Price', sortable:true, right:true},
+    {key:'unrealizedPct', label:'P&L%', sortable:true, right:true},
+    {key:'change', label:'Change', sortable:false, right:true},
+  ];
+
+  thead.innerHTML = cols.map(c => `
+    <th class="${c.right?'right':''} ${sortCol===c.key?'sorted':''}" 
+        ${c.sortable ? `onclick="sortTable('${c.key}')"` : ''}>
+      ${c.label}${c.sortable && sortCol===c.key ? `<span class="sort-arrow">${sortDir===1?'↑':'↓'}</span>` : ''}
+    </th>`).join('');
+
+  // Sort
+  let sorted = [...holdings];
+  sorted.sort((a,b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (sortCol === 'ticker') return sortDir * va.localeCompare(vb);
+    if (va == null) va = -Infinity;
+    if (vb == null) vb = -Infinity;
+    return sortDir * (va - vb);
+  });
+
+  tbody.innerHTML = sorted.map(h => {
+    const change = getPriceChange(h.ticker, changePeriod);
+    const changePill = change
+      ? `<span class="change-pill ${signClass(change.amt)}">${change.amt >= 0 ? '+' : ''}${change.pct?.toFixed(2)}%</span>`
+      : `<span class="change-pill neutral">N/A</span>`;
+
+    if (isTotal) {
+      const plSign = h.unrealized != null ? signClass(h.unrealized) : '';
+      return `<tr onclick="navigate('detail','${h.ticker}')">
+        <td>
+          <div class="ticker-cell">
+            <span class="ticker-name">${h.ticker}</span>
+            <span class="ticker-shares">${fmtNum(h.shares,4)} shares</span>
+          </div>
+        </td>
+        <td class="right price-cell">${h.currentValue != null ? fmt$(h.currentValue) : '<span class="price-loading"></span>'}</td>
+        <td class="right price-cell">${fmt$(h.costBasis)}</td>
+        <td class="right price-cell ${plSign}">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</td>
+        <td class="right">${changePill}</td>
+      </tr>`;
+    } else {
+      const plPct = h.unrealizedPct;
+      return `<tr onclick="navigate('detail','${h.ticker}')">
+        <td>
+          <div class="ticker-cell">
+            <span class="ticker-name">${h.ticker}</span>
+            <span class="ticker-shares" style="font-size:10px;color:var(--text3)">${h.name?.substring(0,18)}</span>
+          </div>
+        </td>
+        <td class="right price-cell">${fmtNum(h.shares,4)}</td>
+        <td class="right price-cell">${fmt$(h.avgCost)}</td>
+        <td class="right price-cell">${h.currentPrice != null ? fmt$(h.currentPrice) : '<span class="price-loading"></span>'}</td>
+        <td class="right price-cell ${plPct != null ? signClass(plPct) : ''}">${plPct != null ? fmtPct(plPct) : '—'}</td>
+        <td class="right">${changePill}</td>
+      </tr>`;
+    }
+  }).join('');
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  renderHoldingsTable();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER DETAIL
+// ═══════════════════════════════════════════════════════════════
+async function renderDetail(ticker) {
+  const holdings = getHoldings();
+  const h = holdings.find(x => x.ticker === ticker);
+  const p = state.prices[ticker];
+
+  // Header
+  const header = document.getElementById('detail-header');
+  const price = p?.price;
+  const changeAmt = p?.change1d;
+  const changePct = p?.changePct1d;
+  header.innerHTML = `
+    <button class="back-btn" onclick="navigate('home')">←</button>
+    <div class="stock-detail-info">
+      <div class="stock-detail-ticker">${ticker}</div>
+      <div class="stock-detail-company">${p?.name || STOCK_DB.find(s=>s.t===ticker)?.n || ''}</div>
+    </div>
+    <div class="stock-detail-price">
+      <div class="stock-detail-price-val">${price ? fmt$(price) : '—'}</div>
+      ${changeAmt != null ? `<div class="stock-detail-price-change ${signClass(changeAmt)}">${changeAmt>=0?'+':''}${fmt$(changeAmt)} (${fmtPct(changePct)}) today</div>` : ''}
+    </div>
+  `;
+
+  // KPIs
+  const kpiEl = document.getElementById('detail-kpis');
+  if (h) {
+    kpiEl.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Current Value</div>
+        <div class="kpi-value">${h.currentValue != null ? fmt$(h.currentValue) : '—'}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Invested</div>
+        <div class="kpi-value">${fmt$(h.costBasis)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Unrealized P&L</div>
+        <div class="kpi-value ${signClass(h.unrealized)}">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</div>
+        <div class="kpi-change ${signClass(h.unrealized)}">${h.unrealizedPct != null ? fmtPct(h.unrealizedPct) : ''}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Realized P&L</div>
+        <div class="kpi-value ${signClass(h.realizedGain)}">${(h.realizedGain>=0?'+':'')+fmt$(h.realizedGain)}</div>
+      </div>
+    `;
+  } else {
+    kpiEl.innerHTML = '<div class="kpi-card full"><div class="kpi-label">Not in current holdings</div></div>';
+  }
+
+  // Chart period buttons
+  const periods = ['1D','1W','1M','3M','6M','1Y','5Y'];
+  document.getElementById('chart-periods').innerHTML = periods.map(p =>
+    `<button class="chart-period-btn ${p===chartPeriod?'active':''}" onclick="loadChart('${ticker}','${p}',this)">${p}</button>`
+  ).join('');
+
+  // Load chart
+  await loadChart(ticker, chartPeriod);
+
+  // Stock info card
+  const infoCard = document.getElementById('detail-info-card');
+  const rows = [
+    ['Open', p?.open ? fmt$(p.open) : '—'],
+    ['Day High', p?.high ? fmt$(p.high) : '—'],
+    ['Day Low', p?.low ? fmt$(p.low) : '—'],
+    ['Volume', p?.volume ? fmtNum(p.volume, 0) : '—'],
+    ['52W High', p?.week52H ? fmt$(p.week52H) : '—'],
+    ['52W Low', p?.week52L ? fmt$(p.week52L) : '—'],
+    ['Market Cap', p?.mktCap ? fmt$K(p.mktCap) : '—'],
+    ['P/E Ratio', p?.pe ? fmtNum(p.pe, 2) : '—'],
+    ['Avg Cost (you)', h ? fmt$(h.avgCost) : '—'],
+    ['Shares Held', h ? fmtNum(h.shares, 6) : '—'],
+  ];
+  infoCard.innerHTML = rows.map(([label, val]) =>
+    `<div class="detail-info-row"><span class="detail-info-label">${label}</span><span class="detail-info-val">${val}</span></div>`
+  ).join('');
+
+  // Transactions for this ticker
+  renderDetailTransactions(ticker);
+}
+
+async function loadChart(ticker, period, btnEl) {
+  chartPeriod = period;
+  if (btnEl) {
+    document.querySelectorAll('.chart-period-btn').forEach(b=>b.classList.remove('active'));
+    btnEl.classList.add('active');
+  }
+  const data = await fetchHistoricalPrices(ticker, period);
+  chartData = data;
+  drawChart(data);
+}
+
+function drawChart(data) {
+  const canvas = document.getElementById('chart-canvas');
+  if (!canvas || !data || !data.length) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width || canvas.parentElement.offsetWidth;
+  const H = 160;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const prices = data.map(d => d.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const pad = { top: 16, right: 16, bottom: 24, left: 12 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const toX = i => pad.left + (i / (data.length - 1)) * cw;
+  const toY = v => pad.top + ch - ((v - min) / range) * ch;
+
+  // Determine color (green if end > start)
+  const isUp = prices[prices.length-1] >= prices[0];
+  const lineColor = isUp ? '#1a9e5c' : '#d63b3b';
+  const fillColor = isUp ? 'rgba(26,158,92,0.08)' : 'rgba(214,59,59,0.08)';
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(prices[0]));
+  for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+  ctx.lineTo(toX(data.length-1), H - pad.bottom);
+  ctx.lineTo(toX(0), H - pad.bottom);
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(prices[0]));
+  for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Touch/hover interaction
+  canvas.ontouchmove = canvas.onmousemove = (e) => {
+    const bounds = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const x = clientX - bounds.left;
+    const idx = Math.round(((x - pad.left) / cw) * (data.length-1));
+    if (idx < 0 || idx >= data.length) return;
+    const pt = data[idx];
+    showChartTooltip(`${pt.date}  ${fmt$(pt.price)}`, clientX, bounds.top - 40);
+  };
+  canvas.ontouchend = canvas.onmouseleave = () => {
+    document.getElementById('chart-tooltip').style.opacity = '0';
+  };
+}
+
+function showChartTooltip(text, x, y) {
+  const t = document.getElementById('chart-tooltip');
+  t.textContent = text;
+  t.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+  t.style.top = (y + window.scrollY - 10) + 'px';
+  t.style.opacity = '1';
+}
+
+function renderDetailTransactions(ticker) {
+  const txs = state.transactions
+    .filter(t => t.ticker === ticker)
+    .sort((a,b) => b.timestamp - a.timestamp);
+  
+  const el = document.getElementById('detail-tx-list');
+  if (!txs.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:24px"><p>No transactions for this stock</p></div>';
+    return;
+  }
+  el.innerHTML = txs.map(tx => buildTxCard(tx, true)).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER HISTORY
+// ═══════════════════════════════════════════════════════════════
+function renderHistory() {
+  const txs = [...state.transactions].sort((a,b) => b.timestamp - a.timestamp);
+  document.getElementById('history-count').textContent = `${txs.length} transactions`;
+  const el = document.getElementById('history-list');
+  if (!txs.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>No transactions</h3><p>Your trade history will appear here</p></div>`;
+    return;
+  }
+  el.innerHTML = txs.map(tx => buildTxCard(tx, true)).join('');
+}
+
+function buildTxCard(tx, showEdit=false) {
+  const total = tx.shares * tx.price;
+  return `<div class="transaction-card">
+    <div class="tx-dot ${tx.type}"></div>
+    <div class="tx-info">
+      <div class="tx-main">
+        <span style="font-weight:600">${tx.ticker}</span>
+        <span class="tx-badge ${tx.type}">${tx.type.toUpperCase()}</span>
+      </div>
+      <div class="tx-sub">${fmtNum(tx.shares,6)} shares @ ${fmt$(tx.price)} · ${fmtDate(tx.date)}</div>
+    </div>
+    <div class="tx-amount ${tx.type==='buy'?'negative':'positive'}">${tx.type==='buy'?'-':'+'}${fmt$(total)}</div>
+    ${showEdit ? `<button class="tx-edit-btn" onclick="openEditModal('${tx.id}')">✏️</button>` : ''}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function renderSettings() {
+  const urlInput = document.getElementById('sheets-url-input');
+  if (urlInput) urlInput.value = state.settings.sheetsUrl || '';
+
+  const keyInput = document.getElementById('av-api-key');
+  if (keyInput) keyInput.value = state.settings.apiKey || '';
+
+  const lastRef = document.getElementById('last-refresh-time');
+  if (lastRef && state.settings.lastRefresh) {
+    lastRef.textContent = new Date(state.settings.lastRefresh).toLocaleString();
+  }
+
+  updateSyncStatus('idle');
+}
+
+function updateSyncStatus(status, msg) {
+  const dot = document.getElementById('sync-dot');
+  const text = document.getElementById('sync-status-text');
+  if (!dot || !text) return;
+  const has = !!state.settings.sheetsUrl;
+  if (!has) { dot.className = 'sync-dot'; text.textContent = 'Not configured'; return; }
+  if (status === 'syncing') { dot.className = 'sync-dot syncing'; text.textContent = 'Syncing…'; }
+  else if (status === 'ok') { dot.className = 'sync-dot connected'; text.textContent = msg || 'Connected'; }
+  else if (status === 'error') { dot.className = 'sync-dot error'; text.textContent = msg || 'Error'; }
+  else { dot.className = 'sync-dot connected'; text.textContent = 'Configured'; }
+}
+
+function saveSheetUrl() {
+  state.settings.sheetsUrl = document.getElementById('sheets-url-input').value.trim();
+  save();
+  updateSyncStatus('idle');
+}
+
+function saveApiKey() {
+  state.settings.apiKey = document.getElementById('av-api-key').value.trim();
+  save();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// ═══════════════════════════════════════════════════════════════
+const APPS_SCRIPT_CODE = `
+function doGet(e) {
+  return handleRequest(e);
+}
+function doPost(e) {
+  return handleRequest(e);
+}
+function handleRequest(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var action = (e.parameter && e.parameter.action) || 
+               (e.postData ? JSON.parse(e.postData.contents).action : 'read');
+  var output;
+  
+  if (action === 'read') {
+    var sheet = ss.getSheetByName('Transactions') || ss.insertSheet('Transactions');
+    var data = sheet.getDataRange().getValues();
+    output = ContentService.createTextOutput(JSON.stringify({ok:true, data:data}));
+  } else if (action === 'write') {
+    var body = JSON.parse(e.postData.contents);
+    var sheet = ss.getSheetByName('Transactions') || ss.insertSheet('Transactions');
+    sheet.clearContents();
+    if (body.rows && body.rows.length) {
+      sheet.getRange(1, 1, body.rows.length, body.rows[0].length).setValues(body.rows);
+    }
+    output = ContentService.createTextOutput(JSON.stringify({ok:true}));
+  }
+  
+  return output.setMimeType(ContentService.MimeType.JSON);
+}
+`.trim();
+
+document.getElementById('apps-script-code-display').textContent = APPS_SCRIPT_CODE.substring(0, 80) + '… (tap to copy)';
+
+function copyAppsScript() {
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(() => {
+    showToast('Code copied to clipboard!', 'success');
+  }).catch(() => {
+    // Fallback
+    const el = document.createElement('textarea');
+    el.value = APPS_SCRIPT_CODE;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('Code copied!', 'success');
+  });
+}
+
+async function syncNow() {
+  const url = state.settings.sheetsUrl;
+  if (!url) { showToast('Add your Apps Script URL in Settings', 'error'); return; }
+
+  updateSyncStatus('syncing');
+
+  // Convert transactions to rows for sheets
+  const header = ['id','ticker','type','shares','price','date','timestamp'];
+  const rows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
+
+  try {
+    // First try to read from sheets
+    const readRes = await fetch(url + '?action=read', { method: 'GET' });
+    const readData = await readRes.json();
+
+    if (readData.ok && readData.data && readData.data.length > 1) {
+      // Sheet has data — merge (sheet is source of truth for existing, local for new)
+      const sheetTxs = readData.data.slice(1).map(r => ({
+        id: String(r[0]), ticker: r[1], type: r[2],
+        shares: parseFloat(r[3]), price: parseFloat(r[4]),
+        date: r[5], timestamp: parseInt(r[6])
+      })).filter(t => t.id && t.ticker);
+      
+      // Merge: keep all sheet txs + any local-only
+      const sheetIds = new Set(sheetTxs.map(t=>t.id));
+      const localOnly = state.transactions.filter(t => !sheetIds.has(t.id));
+      state.transactions = [...sheetTxs, ...localOnly];
+      state.transactions.sort((a,b) => b.timestamp - a.timestamp);
+    }
+
+    // Write merged data back
+    const writeRows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
+    const writeRes = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({action:'write', rows: writeRows})
+    });
+    const writeData = await writeRes.json();
+    
+    if (writeData.ok) {
+      save();
+      updateSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString());
+      showToast('Synced with Google Sheets!', 'success');
+      renderHome();
+    } else {
+      throw new Error('Write failed');
+    }
+  } catch(err) {
+    updateSyncStatus('error', 'Sync failed');
+    showToast('Sync failed. Check your URL.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD / EDIT TRANSACTION
+// ═══════════════════════════════════════════════════════════════
+function openAddModal(prefillTicker) {
+  currentTxType = 'buy';
+  document.getElementById('type-buy').className = 'type-btn buy active';
+  document.getElementById('type-sell').className = 'type-btn sell';
+  document.getElementById('tx-ticker').value = prefillTicker || '';
+  document.getElementById('tx-shares').value = '';
+  document.getElementById('tx-price').value = '';
+  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-total-preview').style.display = 'none';
+  document.getElementById('autocomplete-list').classList.remove('show');
+  
+  // Set up total preview
+  ['tx-shares','tx-price'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateTxPreview);
+  });
+
+  if (prefillTicker) {
+    const p = state.prices[prefillTicker]?.price;
+    if (p) document.getElementById('tx-price').value = p;
+  }
+
+  openModal('add-modal-overlay');
+}
+
+function updateTxPreview() {
+  const shares = parseFloat(document.getElementById('tx-shares').value);
+  const price = parseFloat(document.getElementById('tx-price').value);
+  if (!isNaN(shares) && !isNaN(price) && shares > 0 && price > 0) {
+    document.getElementById('tx-total-preview').style.display = 'block';
+    document.getElementById('tx-total-val').textContent = fmt$(shares * price);
+  } else {
+    document.getElementById('tx-total-preview').style.display = 'none';
+  }
+}
+
+function setTxType(type) {
+  currentTxType = type;
+  document.getElementById('type-buy').className = `type-btn buy${type==='buy'?' active':''}`;
+  document.getElementById('type-sell').className = `type-btn sell${type==='sell'?' active':''}`;
+}
+
+function onTickerInput(val) {
+  const list = document.getElementById('autocomplete-list');
+  const q = val.trim().toUpperCase();
+  if (!q) { list.classList.remove('show'); return; }
+
+  const matches = STOCK_DB.filter(s =>
+    s.t.startsWith(q) || s.n.toUpperCase().includes(q)
+  ).slice(0, 8);
+
+  if (!matches.length) { list.classList.remove('show'); return; }
+
+  list.innerHTML = matches.map(s => `
+    <div class="autocomplete-item" onclick="selectTicker('${s.t}')">
+      <div class="autocomplete-ticker">${s.t}</div>
+      <div class="autocomplete-name">${s.n}</div>
+    </div>
+  `).join('');
+  list.classList.add('show');
+}
+
+function selectTicker(ticker) {
+  document.getElementById('tx-ticker').value = ticker;
+  document.getElementById('autocomplete-list').classList.remove('show');
+  // Try to fill in current price
+  const p = state.prices[ticker]?.price;
+  if (p) document.getElementById('tx-price').value = p.toFixed(2);
+  document.getElementById('tx-shares').focus();
+}
+
+function saveTransaction() {
+  const ticker = document.getElementById('tx-ticker').value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById('tx-shares').value);
+  const price = parseFloat(document.getElementById('tx-price').value);
+  const date = document.getElementById('tx-date').value;
+
+  if (!ticker) { showToast('Enter a ticker symbol', 'error'); return; }
+  if (!shares || shares <= 0) { showToast('Enter valid share count', 'error'); return; }
+  if (!price || price <= 0) { showToast('Enter valid price', 'error'); return; }
+  if (!date) { showToast('Enter a date', 'error'); return; }
+
+  // Validate sell
+  if (currentTxType === 'sell') {
+    const holdings = getHoldings();
+    const h = holdings.find(x => x.ticker === ticker);
+    if (!h) { showToast(`You don't own ${ticker}`, 'error'); return; }
+    if (shares > h.shares) { showToast(`You only own ${fmtNum(h.shares,4)} shares`, 'error'); return; }
+  }
+
+  const tx = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    ticker,
+    type: currentTxType,
+    shares,
+    price,
+    date,
+    timestamp: Date.now()
+  };
+
+  state.transactions.push(tx);
+  save();
+  closeModal('add-modal-overlay');
+  renderHome();
+  showToast(`${currentTxType === 'buy' ? 'Bought' : 'Sold'} ${fmtNum(shares,4)} ${ticker}!`, 'success');
+
+  // Auto-fetch price if new ticker
+  if (!state.prices[ticker] && state.settings.apiKey) {
+    fetchPrice(ticker).then(data => {
+      if (data) { state.prices[ticker] = data; save(); renderHome(); }
+    });
+  }
+}
+
+function openEditModal(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+  currentEditId = id;
+  editTxType = tx.type;
+  
+  document.getElementById('edit-tx-id').value = id;
+  document.getElementById('edit-ticker').value = tx.ticker;
+  document.getElementById('edit-shares').value = tx.shares;
+  document.getElementById('edit-price').value = tx.price;
+  document.getElementById('edit-date').value = tx.date;
+  
+  document.getElementById('edit-type-buy').className = `type-btn buy${tx.type==='buy'?' active':''}`;
+  document.getElementById('edit-type-sell').className = `type-btn sell${tx.type==='sell'?' active':''}`;
+  
+  openModal('edit-modal-overlay');
+}
+
+function setEditTxType(type) {
+  editTxType = type;
+  document.getElementById('edit-type-buy').className = `type-btn buy${type==='buy'?' active':''}`;
+  document.getElementById('edit-type-sell').className = `type-btn sell${type==='sell'?' active':''}`;
+}
+
+function saveEditTransaction() {
+  const id = document.getElementById('edit-tx-id').value;
+  const shares = parseFloat(document.getElementById('edit-shares').value);
+  const price = parseFloat(document.getElementById('edit-price').value);
+  const date = document.getElementById('edit-date').value;
+
+  if (!shares || shares <= 0) { showToast('Enter valid share count', 'error'); return; }
+  if (!price || price <= 0) { showToast('Enter valid price', 'error'); return; }
+  if (!date) { showToast('Enter a date', 'error'); return; }
+
+  const idx = state.transactions.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  
+  state.transactions[idx] = { ...state.transactions[idx], type: editTxType, shares, price, date };
+  save();
+  closeModal('edit-modal-overlay');
+  renderHome();
+  if (currentDetailTicker) renderDetail(currentDetailTicker);
+  renderHistory();
+  showToast('Transaction updated', 'success');
+}
+
+function confirmDeleteTransaction() {
+  showConfirm('Delete Transaction', 'This cannot be undone. The transaction will be permanently removed.', 'Delete', () => {
+    const id = document.getElementById('edit-tx-id').value;
+    state.transactions = state.transactions.filter(t => t.id !== id);
+    save();
+    closeModal('edit-modal-overlay');
+    renderHome();
+    if (currentDetailTicker) renderDetail(currentDetailTicker);
+    renderHistory();
+    showToast('Transaction deleted', '');
+  }, true);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA EXPORT / IMPORT / CLEAR
+// ═══════════════════════════════════════════════════════════════
+function exportData() {
+  const data = { transactions: state.transactions, prices: state.prices, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stock-tracker-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Data exported!', 'success');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.transactions) {
+        state.transactions = data.transactions;
+        if (data.prices) state.prices = { ...state.prices, ...data.prices };
+        save();
+        renderHome();
+        showToast('Data imported!', 'success');
+      } else {
+        showToast('Invalid file format', 'error');
+      }
+    } catch {
+      showToast('Failed to parse file', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function confirmClearData() {
+  showConfirm('Clear All Data', 'This will permanently delete all your transactions and portfolio data. This cannot be undone.', 'Clear All', () => {
+    state.transactions = [];
+    state.prices = {};
+    save();
+    renderHome();
+    showToast('All data cleared', '');
+  }, true);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+  document.getElementById('autocomplete-list')?.classList.remove('show');
+}
+function closeModalOnOverlay(e, id) {
+  if (e.target.id === id) closeModal(id);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM DIALOG
+// ═══════════════════════════════════════════════════════════════
+function showConfirm(title, msg, okLabel, cb, danger=false) {
+  confirmCallback = cb;
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  const okBtn = document.getElementById('confirm-ok-btn');
+  okBtn.textContent = okLabel;
+  okBtn.className = 'confirm-ok' + (danger ? ' danger' : '');
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  confirmCallback = null;
+}
+function runConfirm() {
+  closeConfirm();
+  if (confirmCallback) confirmCallback();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  load();
+  navigate('home');
+  
+  // Close autocomplete on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-wrap')) {
+      document.getElementById('autocomplete-list')?.classList.remove('show');
+    }
+  });
+
+  // Redraw chart on resize
+  window.addEventListener('resize', () => {
+    if (chartData && document.getElementById('screen-detail').classList.contains('active')) {
+      drawChart(chartData);
+    }
+  });
+
+  // Auto-refresh prices if API key exists and it's been a while
+  if (state.settings.apiKey && state.transactions.length) {
+    const last = state.settings.lastRefresh ? new Date(state.settings.lastRefresh) : null;
+    const now = new Date();
+    const hoursSince = last ? (now - last) / 3600000 : Infinity;
+    if (hoursSince > 4) {
+      setTimeout(() => refreshAllPrices(), 1500);
+    }
+  }
+}
+
+init();
+</script>
+</body>
+</html>
