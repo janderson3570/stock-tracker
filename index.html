@@ -42,8 +42,14 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   
-  html, body {
-    height: 100%; width: 100%;
+  html {
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
+  body {
+    height: 100%;
+    width: 100%;
     background: var(--bg);
     font-family: var(--font);
     color: var(--text);
@@ -51,15 +57,20 @@
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
     touch-action: pan-x pan-y;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
   }
 
   #app {
     display: flex;
     flex-direction: column;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    /* Account for safe areas on notched iPhones */
+    /* dvh = dynamic viewport height: correctly excludes iOS home indicator */
+    height: 100dvh;
+    /* Fallback for older iOS that doesn't support dvh */
+    height: -webkit-fill-available;
+    width: 100%;
     padding-top: env(safe-area-inset-top, 0px);
+    overflow: hidden;
   }
 
   /* ── HEADER ── */
@@ -107,6 +118,8 @@
     flex: 1;
     overflow: hidden;
     position: relative;
+    /* min-height:0 is critical — without it, flex children won't shrink below content size */
+    min-height: 0;
   }
   .screen {
     position: absolute;
@@ -114,7 +127,7 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     display: none;
-    padding-bottom: 16px;
+    padding-bottom: 20px;
   }
   .screen.active { display: block; }
 
@@ -126,9 +139,8 @@
     display: flex;
     align-items: flex-start;
     padding-top: 10px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Ensure it sits at the absolute bottom */
-    position: relative;
+    /* Pad out the iOS home indicator area so tabs don't sit on top of it */
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
     z-index: 10;
   }
   .tab-btn {
@@ -140,9 +152,9 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0 0 10px 0;
+    padding: 0;
     transition: opacity 0.15s;
-    min-height: 52px;
+    min-height: 44px;
   }
   .tab-btn:active { opacity: 0.6; }
   .tab-icon {
@@ -1625,13 +1637,94 @@ const STOCK_DB = [
   {t:'LAZR',n:'Luminar Technologies Inc.'},{t:'INVZ',n:'Innoviz Technologies Ltd.'},
 ];
 
-// De-duplicate the stock DB by ticker
+// De-duplicate the hardcoded stock DB by ticker (fallback only)
 const _seenTickers = new Set();
 const STOCK_DB_DEDUP = STOCK_DB.filter(s => {
   if (_seenTickers.has(s.t)) return false;
   _seenTickers.add(s.t);
   return true;
 });
+
+// Live listing from Alpha Vantage — populated on init, searched first in autocomplete
+// Format: [{t:'AAPL', n:'Apple Inc.', e:'NYSE'}, ...]
+let LIVE_LISTING = [];
+
+// Helper: look up company name from live listing or fallback hardcoded DB
+function tickerName(ticker) {
+  const live = LIVE_LISTING.find(s => s.t === ticker);
+  if (live) return live.n;
+  const db = STOCK_DB_DEDUP.find(s => s.t === ticker);
+  return db ? db.n : ticker;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIVE LISTING — fetch all US stocks from Alpha Vantage
+// Cached in localStorage for 7 days so we don't waste API calls
+// ═══════════════════════════════════════════════════════════════
+const LISTING_CACHE_KEY = 'st_listing_cache';
+const LISTING_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+async function loadLiveListing() {
+  // Try cache first
+  try {
+    const cached = localStorage.getItem(LISTING_CACHE_KEY);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < LISTING_CACHE_TTL && data.length > 100) {
+        LIVE_LISTING = data;
+        console.log(`Loaded ${data.length} tickers from cache`);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // Fetch fresh from Alpha Vantage listing status endpoint
+  const key = '7CEQOA1NBV1XNPB0';
+  try {
+    const url = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${key}`;
+    const res = await fetch(url);
+    const text = await res.text();
+
+    // Parse CSV: symbol,name,exchange,assetType,ipoDate,delistingDate,status
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) throw new Error('Bad response');
+
+    const parsed = [];
+    for (let i = 1; i < lines.length; i++) {
+      // CSV may have quoted fields — handle simply
+      const cols = lines[i].split(',');
+      if (cols.length < 4) continue;
+      const symbol  = (cols[0] || '').trim().replace(/^"|"$/g, '');
+      const name    = (cols[1] || '').trim().replace(/^"|"$/g, '');
+      const exchange= (cols[2] || '').trim().replace(/^"|"$/g, '');
+      const type    = (cols[3] || '').trim().replace(/^"|"$/g, '');
+      const status  = (cols[6] || '').trim().replace(/^"|"$/g, '');
+
+      // Only active US-listed equities and ETFs
+      if (!symbol || !name) continue;
+      if (status && status.toLowerCase() !== 'active') continue;
+      if (!['NYSE','NASDAQ','NYSE ARCA','NYSE MKT','BATS'].includes(exchange) &&
+          !exchange.startsWith('NYSE') && !exchange.startsWith('NASDAQ')) continue;
+
+      parsed.push({ t: symbol, n: name, e: exchange, _type: type });
+    }
+
+    if (parsed.length > 100) {
+      LIVE_LISTING = parsed;
+      try {
+        localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: parsed }));
+      } catch(e) {
+        // localStorage quota — store a trimmed version (symbol+name only)
+        const slim = parsed.map(s => ({ t: s.t, n: s.n }));
+        try { localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: slim })); } catch(e2) {}
+      }
+      console.log(`Fetched ${parsed.length} live tickers from Alpha Vantage`);
+    }
+  } catch(err) {
+    console.warn('Could not fetch live listing, using built-in database', err);
+    // Fall through — LIVE_LISTING stays empty, autocomplete uses STOCK_DB_DEDUP
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // STATE
@@ -1772,7 +1865,7 @@ function getHoldings() {
 
     holdings.push({
       ticker,
-      name: priceData?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ticker,
+      name: priceData?.name || tickerName(ticker),
       shares: currentShares,
       avgCost,
       costBasis,
@@ -1849,7 +1942,7 @@ async function fetchPrice(ticker) {
       high: parseFloat(q['03. high']),
       low: parseFloat(q['04. low']),
       volume: parseInt(q['06. volume']),
-      name: STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ticker
+      name: tickerName(ticker)
     };
   } catch(e) {
     return null;
@@ -1973,7 +2066,7 @@ function navigate(screen, ticker) {
     document.getElementById('tab-detail-label').textContent = ticker;
     document.getElementById('header-title').textContent = ticker;
     const p = state.prices[ticker];
-    document.getElementById('header-subtitle').textContent = p?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || '';
+    document.getElementById('header-subtitle').textContent = p?.name || tickerName(ticker);
     document.getElementById('header-subtitle').style.display = 'block';
     addBtn.style.display = 'none';
     renderDetail(ticker);
@@ -2172,7 +2265,7 @@ async function renderDetail(ticker) {
     <button class="back-btn" onclick="navigate('home')">←</button>
     <div class="stock-detail-info">
       <div class="stock-detail-ticker">${ticker}</div>
-      <div class="stock-detail-company">${p?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ''}</div>
+      <div class="stock-detail-company">${p?.name || tickerName(ticker)}</div>
     </div>
     <div class="stock-detail-price">
       <div class="stock-detail-price-val">${price ? fmt$(price) : '—'}</div>
@@ -2559,25 +2652,40 @@ function onTickerInput(val) {
   const q = val.trim().toUpperCase();
   if (!q) { list.classList.remove('show'); return; }
 
-  const matches = STOCK_DB_DEDUP.filter(s =>
-    s.t.startsWith(q) || s.t.includes(q) || s.n.toUpperCase().includes(q)
-  ).slice(0, 10);
+  // Search live listing first (Alpha Vantage full list), fall back to hardcoded DB
+  const searchSource = LIVE_LISTING.length > 100 ? LIVE_LISTING : STOCK_DB_DEDUP;
 
-  // Always show a "Use [TICKER] anyway" option if not an exact match
-  const exactMatch = STOCK_DB_DEDUP.find(s => s.t === q);
+  // Scoring: exact ticker match first, then ticker starts-with, then name contains
+  const scored = [];
+  for (const s of searchSource) {
+    const t = s.t.toUpperCase();
+    const n = (s.n || '').toUpperCase();
+    if (t === q)               scored.push({ s, score: 0 });
+    else if (t.startsWith(q)) scored.push({ s, score: 1 });
+    else if (n.startsWith(q)) scored.push({ s, score: 2 });
+    else if (t.includes(q))   scored.push({ s, score: 3 });
+    else if (n.includes(q))   scored.push({ s, score: 4 });
+    if (scored.length >= 50) break; // cap early for performance
+  }
+  scored.sort((a, b) => a.score - b.score);
+  const matches = scored.slice(0, 10).map(x => x.s);
+
+  // Show a "use anyway" option if no exact match
+  const exactMatch = matches.find(s => s.t.toUpperCase() === q);
   const items = [...matches];
   if (!exactMatch && q.length >= 1) {
-    items.push({ t: q, n: 'Enter manually (not in database)', _manual: true });
+    items.push({ t: q, n: LIVE_LISTING.length > 100 ? 'Not found — add manually' : 'Enter manually (loading full list…)', _manual: true });
   }
 
   if (!items.length) { list.classList.remove('show'); return; }
 
-  list.innerHTML = items.map(s => `
-    <div class="autocomplete-item" onclick="selectTicker('${s.t}')">
-      <div class="autocomplete-ticker">${s.t}</div>
+  list.innerHTML = items.map(s => {
+    const exchange = s.e ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${s.e}</span>` : '';
+    return `<div class="autocomplete-item" onclick="selectTicker('${s.t.replace(/'/g,"\\'")}')">
+      <div class="autocomplete-ticker">${s.t}${exchange}</div>
       <div class="autocomplete-name" style="${s._manual ? 'color:var(--blue);font-style:italic' : ''}">${s.n}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   list.classList.add('show');
 }
 
@@ -2809,6 +2917,9 @@ function recordLastActive() {
 function init() {
   load();
   navigate('home');
+
+  // Load the full Alpha Vantage stock listing for autocomplete (async, non-blocking)
+  loadLiveListing();
 
   // Close autocomplete on outside click
   document.addEventListener('click', (e) => {
