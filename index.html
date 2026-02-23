@@ -1967,35 +1967,104 @@ function getPortfolioKPIs() {
 // Primary: Alpha Vantage; fallback: Yahoo Finance via proxy-less approach
 // Since we can't reliably CORS-proxy Yahoo, we use Alpha Vantage + demo fallback
 
+// ── API quota tracker ──
+// Counts requests used today, resets at midnight. Stored in localStorage.
+function getQuotaToday() {
+  try {
+    const raw = localStorage.getItem('st_quota');
+    if (!raw) return { date: '', used: 0 };
+    return JSON.parse(raw);
+  } catch(e) { return { date: '', used: 0 }; }
+}
+function recordApiCall(count = 1) {
+  const today = new Date().toISOString().split('T')[0];
+  const q = getQuotaToday();
+  const used = (q.date === today ? q.used : 0) + count;
+  localStorage.setItem('st_quota', JSON.stringify({ date: today, used }));
+  return used;
+}
+function getRemainingQuota() {
+  const today = new Date().toISOString().split('T')[0];
+  const q = getQuotaToday();
+  const used = q.date === today ? q.used : 0;
+  return Math.max(0, 25 - used);
+}
+
+// Parse a single quote object from AV response into our price shape
+function parseQuote(q, ticker) {
+  if (!q || !q['05. price']) return null;
+  const prevClose = parseFloat(q['08. previous close']);
+  const price     = parseFloat(q['05. price']);
+  const changeAmt = parseFloat(q['09. change']);
+  const changePct = parseFloat(q['10. change percent']);
+  return {
+    price,
+    prevClose,
+    change1d:    changeAmt,
+    changePct1d: isNaN(changePct) ? ((price - prevClose) / prevClose * 100) : changePct,
+    open:   parseFloat(q['02. open']),
+    high:   parseFloat(q['03. high']),
+    low:    parseFloat(q['04. low']),
+    volume: parseInt(q['06. volume']),
+    name:   tickerName(ticker)
+  };
+}
+
+// Single-ticker fetch — used when a new stock is added mid-session
 async function fetchPrice(ticker) {
   const key = state.settings.apiKey;
   if (!key) return null;
-
   try {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${key}`;
     const r = await fetch(url);
     const data = await r.json();
-    const q = data['Global Quote'];
-    if (!q || !q['05. price']) return null;
-
-    const prevClose = parseFloat(q['08. previous close']);
-    const price = parseFloat(q['05. price']);
-    const changeAmt = parseFloat(q['09. change']);
-    const changePct = parseFloat(q['10. change percent']);
-
-    return {
-      price,
-      prevClose,
-      change1d: changeAmt,
-      changePct1d: isNaN(changePct) ? ((price-prevClose)/prevClose*100) : changePct,
-      open: parseFloat(q['02. open']),
-      high: parseFloat(q['03. high']),
-      low: parseFloat(q['04. low']),
-      volume: parseInt(q['06. volume']),
-      name: tickerName(ticker)
-    };
+    const result = parseQuote(data['Global Quote'], ticker);
+    if (result) recordApiCall(1);
+    return result;
   } catch(e) {
     return null;
+  }
+}
+
+// Batch fetch — up to 100 tickers in ONE request (saves 99 requests vs looping)
+async function fetchPricesBatch(tickers) {
+  const key = state.settings.apiKey;
+  if (!key || !tickers.length) return {};
+  try {
+    const symbols = tickers.join(',');
+    const url = `https://www.alphavantage.co/query?function=BATCH_STOCK_QUOTES&symbols=${symbols}&apikey=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    const quotes = data['Stock Quotes'];
+    if (!quotes || !Array.isArray(quotes)) return {};
+
+    recordApiCall(1); // entire batch = 1 request
+    const results = {};
+    for (const q of quotes) {
+      const ticker = q['1. symbol'];
+      if (!ticker) continue;
+      // BATCH_STOCK_QUOTES returns slightly different field names
+      const price     = parseFloat(q['2. price']);
+      const prevClose = parseFloat(q['5. previous close'] || q['4. previous close'] || 0);
+      const changeAmt = price - prevClose;
+      const changePct = prevClose ? (changeAmt / prevClose * 100) : 0;
+      if (!isNaN(price) && price > 0) {
+        results[ticker] = {
+          price,
+          prevClose,
+          change1d:    changeAmt,
+          changePct1d: changePct,
+          open:   prevClose, // batch endpoint doesn't return intraday OHLV
+          high:   null,
+          low:    null,
+          volume: parseInt(q['3. volume'] || '0'),
+          name:   tickerName(ticker)
+        };
+      }
+    }
+    return results;
+  } catch(e) {
+    return {};
   }
 }
 
@@ -2059,25 +2128,53 @@ function generateMockChart(ticker, period) {
 }
 
 async function refreshAllPrices() {
-  const tickers = [...new Set(state.transactions.map(t=>t.ticker))];
+  const tickers = [...new Set(state.transactions.map(t => t.ticker))];
   if (!tickers.length) { showToast('No stocks to refresh', 'error'); return; }
   if (!state.settings.apiKey) { showToast('Add API key in Settings first', 'error'); return; }
 
+  // Warn if quota is nearly exhausted
+  const remaining = getRemainingQuota();
+  if (remaining < 1) {
+    showToast('Daily API limit reached (25/25). Try again tomorrow.', 'error');
+    return;
+  }
+
   showToast('Refreshing prices…', '');
+
+  // Use batch endpoint — all tickers in ONE request regardless of count
+  // Alpha Vantage batch supports up to 100 symbols at once
   let updated = 0;
-  for (const ticker of tickers) {
-    const data = await fetchPrice(ticker);
-    if (data) {
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+    const chunk = tickers.slice(i, i + BATCH_SIZE);
+    const results = await fetchPricesBatch(chunk);
+    for (const [ticker, data] of Object.entries(results)) {
+      // Preserve any detailed data (52W high/low, etc.) from individual fetches,
+      // but overwrite price/change fields with fresh batch data
       state.prices[ticker] = { ...state.prices[ticker], ...data };
       updated++;
     }
-    await new Promise(r => setTimeout(r, 300)); // rate limit
+
+    // For any tickers that the batch missed (some ETFs/OTCs not in batch),
+    // fall back to individual GLOBAL_QUOTE — but only if we have quota left
+    const missed = chunk.filter(t => !results[t]);
+    for (const ticker of missed) {
+      if (getRemainingQuota() < 1) break;
+      const data = await fetchPrice(ticker);
+      if (data) {
+        state.prices[ticker] = { ...state.prices[ticker], ...data };
+        updated++;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
   }
+
   state.settings.lastRefresh = new Date().toISOString();
   save();
   renderHome();
   renderSettings();
-  showToast(`Updated ${updated}/${tickers.length} prices`, 'success');
+  const left = getRemainingQuota();
+  showToast(`Updated ${updated}/${tickers.length} prices · ${left} API calls left today`, 'success');
 }
 
 // Change % by period
@@ -2209,7 +2306,7 @@ function renderHomeKPIs() {
   rzEl.textContent = fmt$(kpis.allRealized);
   rzEl.className = 'kpi-value ' + signClass(kpis.allRealized);
 
-  // Last refresh time on home screen
+  // Last refresh time + quota on home screen
   const refreshEl = document.getElementById('home-last-refresh');
   if (refreshEl) {
     if (state.settings.lastRefresh) {
@@ -2221,9 +2318,13 @@ function renderHomeKPIs() {
       else if (diffMin < 60) timeStr = `${diffMin}m ago`;
       else if (diffMin < 1440) timeStr = `${Math.floor(diffMin/60)}h ${diffMin%60}m ago`;
       else timeStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-      refreshEl.textContent = `Prices as of ${timeStr}`;
+      const quotaLeft = getRemainingQuota();
+      refreshEl.textContent = `Prices as of ${timeStr} · ${quotaLeft} API calls left today`;
     } else {
-      refreshEl.textContent = state.settings.apiKey ? 'Prices not yet refreshed' : 'Add API key in Settings to get live prices';
+      const left = getRemainingQuota();
+      refreshEl.textContent = state.settings.apiKey
+        ? `Prices not yet refreshed · ${left} API calls left today`
+        : 'Add API key in Settings to get live prices';
     }
   }
 }
