@@ -40,6 +40,7 @@
     --mono: 'DM Mono', monospace;
   }
 
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   
   html, body {
@@ -1003,10 +1004,19 @@
           </div>
         </div>
 
-        <!-- Last Refreshed -->
-        <div id="last-refresh-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:-4px">
-          <div style="font-size:11px;color:var(--text3)" id="home-last-refresh">Prices not yet refreshed</div>
-          <button onclick="refreshAllPrices()" style="font-size:11px;color:var(--text2);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;padding:4px 0">↻ Refresh</button>
+        <!-- Last Refreshed Card -->
+        <div id="last-refresh-bar" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)">
+          <div>
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:3px">Prices Last Updated</div>
+            <div style="font-size:13px;font-weight:500;color:var(--text)" id="home-last-refresh">Never refreshed</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px" id="home-quota-label"></div>
+          </div>
+          <button onclick="refreshAllPrices()" id="refresh-btn"
+            style="display:flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:opacity 0.15s;flex-shrink:0"
+            ontouchstart="this.style.opacity='0.75'" ontouchend="this.style.opacity='1'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="refresh-icon"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Refresh
+          </button>
         </div>
 
         <!-- Holdings Table -->
@@ -1853,8 +1863,49 @@ function fmtNum(n, dec=4) {
 }
 function fmtDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
+  let d;
+
+  // Google Sheets serial number (days since Dec 30, 1899)
+  if (typeof dateStr === 'number' || /^\d{4,5}$/.test(String(dateStr).trim())) {
+    const serial = parseInt(dateStr);
+    d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+
+  // ISO format: "2025-01-15"
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(String(dateStr).trim())) {
+    d = new Date(String(dateStr).trim().substring(0, 10) + 'T00:00:00');
+
+  // US format: "1/15/2025" or "01/15/2025"
+  } else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(String(dateStr).trim())) {
+    const parts = String(dateStr).trim().split('/');
+    d = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+
+  // Fallback: let browser try, but add noon time to avoid timezone day-shift
+  } else {
+    d = new Date(String(dateStr).trim());
+    if (isNaN(d.getTime())) return String(dateStr); // give up, show raw
+  }
+
+  if (isNaN(d.getTime())) return String(dateStr);
   return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+// Also normalize a date string coming FROM sheets to YYYY-MM-DD for storage
+function normalizeDate(dateStr) {
+  if (!dateStr) return '';
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(String(dateStr).trim())) return String(dateStr).trim().substring(0, 10);
+  // Serial number
+  if (typeof dateStr === 'number' || /^\d{4,5}$/.test(String(dateStr).trim())) {
+    const d = new Date(Date.UTC(1899, 11, 30) + parseInt(dateStr) * 86400000);
+    return d.toISOString().split('T')[0];
+  }
+  // US format M/D/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(String(dateStr).trim())) {
+    const parts = String(dateStr).trim().split('/');
+    const d = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+    return d.toISOString().split('T')[0];
+  }
+  return String(dateStr);
 }
 function signClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
 function signStr(n, prefix='') {
@@ -2027,45 +2078,30 @@ async function fetchPrice(ticker) {
 }
 
 // Batch fetch — up to 100 tickers in ONE request (saves 99 requests vs looping)
+// Fetch all tickers in parallel using GLOBAL_QUOTE (reliable free-tier endpoint).
+// Fires all requests simultaneously so 10 stocks takes the same time as 1.
 async function fetchPricesBatch(tickers) {
   const key = state.settings.apiKey;
   if (!key || !tickers.length) return {};
-  try {
-    const symbols = tickers.join(',');
-    const url = `https://www.alphavantage.co/query?function=BATCH_STOCK_QUOTES&symbols=${symbols}&apikey=${key}`;
-    const r = await fetch(url);
-    const data = await r.json();
-    const quotes = data['Stock Quotes'];
-    if (!quotes || !Array.isArray(quotes)) return {};
 
-    recordApiCall(1); // entire batch = 1 request
-    const results = {};
-    for (const q of quotes) {
-      const ticker = q['1. symbol'];
-      if (!ticker) continue;
-      // BATCH_STOCK_QUOTES returns slightly different field names
-      const price     = parseFloat(q['2. price']);
-      const prevClose = parseFloat(q['5. previous close'] || q['4. previous close'] || 0);
-      const changeAmt = price - prevClose;
-      const changePct = prevClose ? (changeAmt / prevClose * 100) : 0;
-      if (!isNaN(price) && price > 0) {
-        results[ticker] = {
-          price,
-          prevClose,
-          change1d:    changeAmt,
-          changePct1d: changePct,
-          open:   prevClose, // batch endpoint doesn't return intraday OHLV
-          high:   null,
-          low:    null,
-          volume: parseInt(q['3. volume'] || '0'),
-          name:   tickerName(ticker)
-        };
-      }
-    }
-    return results;
-  } catch(e) {
-    return {};
-  }
+  const results = {};
+  // Fire all requests at once
+  const fetches = tickers.map(ticker => {
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${key}`;
+    return fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        const q = data['Global Quote'];
+        const parsed = parseQuote(q, ticker);
+        if (parsed) results[ticker] = parsed;
+      })
+      .catch(() => {}); // silently skip failed individual tickers
+  });
+
+  await Promise.allSettled(fetches);
+  // Record actual number of successful calls made
+  recordApiCall(tickers.length);
+  return results;
 }
 
 async function fetchHistoricalPrices(ticker, period) {
@@ -2139,42 +2175,33 @@ async function refreshAllPrices() {
     return;
   }
 
+  // Animate refresh button
+  const refreshBtn = document.getElementById('refresh-btn');
+  const refreshIcon = document.getElementById('refresh-icon');
+  if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.style.opacity = '0.6'; }
+  if (refreshIcon) refreshIcon.style.animation = 'spin 1s linear infinite';
+
   showToast('Refreshing prices…', '');
 
-  // Use batch endpoint — all tickers in ONE request regardless of count
-  // Alpha Vantage batch supports up to 100 symbols at once
+  // Fire all tickers in parallel — fast and uses the reliable GLOBAL_QUOTE endpoint
   let updated = 0;
-  const BATCH_SIZE = 100;
-  for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
-    const chunk = tickers.slice(i, i + BATCH_SIZE);
-    const results = await fetchPricesBatch(chunk);
-    for (const [ticker, data] of Object.entries(results)) {
-      // Preserve any detailed data (52W high/low, etc.) from individual fetches,
-      // but overwrite price/change fields with fresh batch data
-      state.prices[ticker] = { ...state.prices[ticker], ...data };
-      updated++;
-    }
-
-    // For any tickers that the batch missed (some ETFs/OTCs not in batch),
-    // fall back to individual GLOBAL_QUOTE — but only if we have quota left
-    const missed = chunk.filter(t => !results[t]);
-    for (const ticker of missed) {
-      if (getRemainingQuota() < 1) break;
-      const data = await fetchPrice(ticker);
-      if (data) {
-        state.prices[ticker] = { ...state.prices[ticker], ...data };
-        updated++;
-      }
-      await new Promise(r => setTimeout(r, 200));
-    }
+  const results = await fetchPricesBatch(tickers);
+  for (const [ticker, data] of Object.entries(results)) {
+    state.prices[ticker] = { ...state.prices[ticker], ...data };
+    updated++;
   }
 
   state.settings.lastRefresh = new Date().toISOString();
   save();
   renderHome();
   renderSettings();
+  // Stop button animation
+  if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.style.opacity = '1'; }
+  if (refreshIcon) refreshIcon.style.animation = '';
+
+  renderRefreshBar();
   const left = getRemainingQuota();
-  showToast(`Updated ${updated}/${tickers.length} prices · ${left} API calls left today`, 'success');
+  showToast(`Updated ${updated}/${tickers.length} prices · ${left} calls left today`, 'success');
 }
 
 // Change % by period
@@ -2306,27 +2333,58 @@ function renderHomeKPIs() {
   rzEl.textContent = fmt$(kpis.allRealized);
   rzEl.className = 'kpi-value ' + signClass(kpis.allRealized);
 
-  // Last refresh time + quota on home screen
+  renderRefreshBar();
+}
+
+function renderRefreshBar() {
   const refreshEl = document.getElementById('home-last-refresh');
-  if (refreshEl) {
-    if (state.settings.lastRefresh) {
-      const d = new Date(state.settings.lastRefresh);
-      const now = new Date();
-      const diffMin = Math.floor((now - d) / 60000);
-      let timeStr;
-      if (diffMin < 1) timeStr = 'just now';
-      else if (diffMin < 60) timeStr = `${diffMin}m ago`;
-      else if (diffMin < 1440) timeStr = `${Math.floor(diffMin/60)}h ${diffMin%60}m ago`;
-      else timeStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-      const quotaLeft = getRemainingQuota();
-      refreshEl.textContent = `Prices as of ${timeStr} · ${quotaLeft} API calls left today`;
-    } else {
-      const left = getRemainingQuota();
-      refreshEl.textContent = state.settings.apiKey
-        ? `Prices not yet refreshed · ${left} API calls left today`
-        : 'Add API key in Settings to get live prices';
-    }
+  const quotaEl   = document.getElementById('home-quota-label');
+  const btn       = document.getElementById('refresh-btn');
+  if (!refreshEl) return;
+
+  const quotaLeft = getRemainingQuota();
+  const quotaUsed = 25 - quotaLeft;
+
+  // Quota line — color-coded by how many are left
+  if (quotaEl) {
+    let quotaColor = 'var(--text3)';
+    if (quotaLeft <= 5)  quotaColor = 'var(--red)';
+    else if (quotaLeft <= 10) quotaColor = '#d97706'; // amber
+    quotaEl.style.color = quotaColor;
+    quotaEl.textContent = `${quotaLeft} of 25 API calls remaining today`;
   }
+
+  // Disable button if out of quota
+  if (btn) {
+    const outOfQuota = quotaLeft < 1;
+    btn.disabled = outOfQuota;
+    btn.style.opacity = outOfQuota ? '0.4' : '1';
+    btn.style.cursor  = outOfQuota ? 'not-allowed' : 'pointer';
+  }
+
+  // Last refresh timestamp
+  if (!state.settings.lastRefresh) {
+    refreshEl.textContent = state.settings.apiKey
+      ? 'Tap Refresh to load live prices'
+      : 'Add API key in Settings';
+    return;
+  }
+
+  const d = new Date(state.settings.lastRefresh);
+  const now = new Date();
+  const diffMin = Math.floor((now - d) / 60000);
+  let timeStr;
+  if (diffMin < 1)        timeStr = 'just now';
+  else if (diffMin < 60)  timeStr = `${diffMin} minute${diffMin===1?'':'s'} ago`;
+  else if (diffMin < 1440) {
+    const h = Math.floor(diffMin / 60);
+    const m = diffMin % 60;
+    timeStr = `${h}h ${m}m ago`;
+  } else {
+    timeStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'})
+            + ' at ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+  refreshEl.textContent = timeStr;
 }
 
 function renderHoldingsTable() {
@@ -3007,6 +3065,41 @@ async function syncInBackground() {
   }
 }
 
+// Pull transactions from Google Sheets into local state (read-only, no write).
+// Used on first load on a new device to restore data.
+async function syncFromSheets() {
+  const url = state.settings.sheetsUrl;
+  if (!url) return;
+  try {
+    const res = await fetch(url + '?action=read', { method: 'GET' });
+    const data = await res.json();
+    if (data.ok && data.data && data.data.length > 1) {
+      const sheetTxs = data.data.slice(1).map(r => ({
+        id: String(r[0]), ticker: r[1], type: r[2],
+        shares: parseFloat(r[3]), price: parseFloat(r[4]),
+        date: normalizeDate(r[5]),
+        timestamp: parseInt(r[6])
+      })).filter(t => t.id && t.ticker && !isNaN(t.shares) && !isNaN(t.price));
+
+      if (sheetTxs.length > 0) {
+        state.transactions = sheetTxs;
+        state.transactions.sort((a, b) => b.timestamp - a.timestamp);
+        save();
+        renderHome();
+        showToast(`Loaded ${sheetTxs.length} transactions from Google Sheets`, 'success');
+        // Now refresh prices for the loaded holdings
+        if (state.settings.apiKey) {
+          setTimeout(() => refreshAllPrices(), 800);
+        }
+      } else {
+        showToast('Connected to Sheets — no transactions found yet', '');
+      }
+    }
+  } catch(err) {
+    showToast('Could not load from Google Sheets', 'error');
+  }
+}
+
 async function syncNow() {
   const url = state.settings.sheetsUrl;
   if (!url) { showToast('Add your Apps Script URL in Settings', 'error'); return; }
@@ -3027,7 +3120,8 @@ async function syncNow() {
       const sheetTxs = readData.data.slice(1).map(r => ({
         id: String(r[0]), ticker: r[1], type: r[2],
         shares: parseFloat(r[3]), price: parseFloat(r[4]),
-        date: r[5], timestamp: parseInt(r[6])
+        date: normalizeDate(r[5]),   // handle Sheets date formats
+        timestamp: parseInt(r[6])
       })).filter(t => t.id && t.ticker);
       
       // Merge: keep all sheet txs + any local-only
@@ -3366,25 +3460,18 @@ function showToast(msg, type='') {
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
-const REFRESH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-
-function shouldAutoRefresh() {
-  if (!state.settings.apiKey || !state.transactions.length) return false;
-  const lastActive = parseInt(localStorage.getItem('st_last_active') || '0');
-  const msSinceLast = Date.now() - lastActive;
-  return msSinceLast > REFRESH_COOLDOWN_MS;
-}
-
-function recordLastActive() {
-  localStorage.setItem('st_last_active', String(Date.now()));
-}
-
 function init() {
   load();
   navigate('home');
 
   // Load the full Alpha Vantage stock listing for autocomplete (async, non-blocking)
   loadLiveListing();
+
+  // If we have a Sheets URL but no local transactions, auto-pull from Sheets.
+  if (state.settings.sheetsUrl && state.transactions.length === 0) {
+    showToast('Loading your data from Google Sheets…', '');
+    syncFromSheets();
+  }
 
   // Close autocomplete on outside click
   document.addEventListener('click', (e) => {
@@ -3400,26 +3487,11 @@ function init() {
     }
   });
 
-  // Track when the app goes to background so we know how long it was away
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      recordLastActive();
-    } else if (document.visibilityState === 'visible') {
-      // App came back to foreground — refresh only if away > 5 min
-      if (shouldAutoRefresh()) {
-        setTimeout(() => refreshAllPrices(), 800);
-      }
-    }
-  });
-
-  // On first open: refresh if no recent activity recorded
-  if (shouldAutoRefresh()) {
-    setTimeout(() => refreshAllPrices(), 800);
-  }
-
-  // Record now as active (covers the case where we never get a 'hidden' event)
-  window.addEventListener('beforeunload', recordLastActive);
-  recordLastActive();
+  // Tick the "X minutes ago" label every minute so it stays accurate
+  setInterval(() => {
+    const refreshEl = document.getElementById('home-last-refresh');
+    if (refreshEl) renderRefreshBar();
+  }, 60000);
 }
 
 init();
