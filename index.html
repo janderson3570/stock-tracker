@@ -1179,7 +1179,7 @@
           <div class="step-item">
             <div class="step-num">6</div>
             <div class="step-content">
-              <div class="step-title">Stock prices (Alpha Vantage)</div>
+              <div class="step-title">Stock prices (Finnhub)</div>
               <div class="step-desc">For live prices, get a free API key at <strong>finnhub.io</strong> — free tier allows 60 calls/minute with no daily limit.</div>
             </div>
           </div>
@@ -1190,11 +1190,11 @@
       <div class="settings-section">
         <div class="settings-section-title">Live Stock Prices</div>
         <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
-          <div class="settings-row-label">Alpha Vantage API Key</div>
+          <div class="settings-row-label">Finnhub API Key</div>
           <input class="settings-input-full" id="av-api-key" type="text"
             placeholder="Your free API key from finnhub.io"
             oninput="saveApiKey()">
-          <div style="font-size:11px;color:var(--text3)">Free: 25 requests/day. Prices refresh when you open the app.</div>
+          <div style="font-size:11px;color:var(--text3)">Free tier: 60 calls/minute, no daily limit. Get your key at finnhub.io</div>
         </div>
         <div class="settings-row" style="justify-content:space-between">
           <div>
@@ -1796,7 +1796,7 @@ async function loadLiveListing() {
         const slim = parsed.map(s => ({ t: s.t, n: s.n }));
         try { localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: slim })); } catch(e2) {}
       }
-      console.log(`Fetched ${parsed.length} live tickers from Alpha Vantage`);
+      console.log(`Fetched ${parsed.length} live tickers for autocomplete`);
     }
   } catch(err) {
     console.warn('Could not fetch live listing, using built-in database', err);
@@ -2034,8 +2034,8 @@ function getPortfolioKPIs() {
 // ═══════════════════════════════════════════════════════════════
 // PRICE DATA
 // ═══════════════════════════════════════════════════════════════
-// Primary: Alpha Vantage; fallback: Yahoo Finance via proxy-less approach
-// Since we can't reliably CORS-proxy Yahoo, we use Alpha Vantage + demo fallback
+
+
 
 // ── API quota tracker ──
 // Counts requests used today, resets at midnight UTC. Stored in localStorage.
@@ -2088,16 +2088,19 @@ function formatResetTime() {
 // ── Finnhub price helpers ──
 // Finnhub quote: { c: price, d: change, dp: changePct, h: high, l: low, o: open, pc: prevClose }
 function parseFinnhubQuote(data, ticker) {
-  if (!data || !data.c || data.c === 0) return null;
+  if (!data) return null;
+  // Finnhub returns c:0 when market is closed but pc (prev close) still has the last price
+  const price = data.c && data.c !== 0 ? data.c : data.pc;
+  if (!price || price === 0) return null;
   return {
-    price:       data.c,
-    prevClose:   data.pc,
-    change1d:    data.d,
-    changePct1d: data.dp,
-    open:        data.o,
-    high:        data.h,
-    low:         data.l,
-    volume:      null, // not in basic quote endpoint
+    price,
+    prevClose:   data.pc   || price,
+    change1d:    data.d    || 0,
+    changePct1d: data.dp   || 0,
+    open:        data.o    || price,
+    high:        data.h    || price,
+    low:         data.l    || price,
+    volume:      null,
     name:        tickerName(ticker)
   };
 }
@@ -2141,13 +2144,16 @@ async function fetchPricesBatch(tickers) {
       .then(r => r.json())
       .then(data => {
         if (data.error) {
+          console.warn(`Finnhub error for ${ticker}:`, data.error);
           if (data.error.includes('limit') || data.error.includes('429')) rateLimitDetected = true;
           return;
         }
+        console.log(`Finnhub ${ticker}:`, data);
         const parsed = parseFinnhubQuote(data, ticker);
         if (parsed) results[ticker] = parsed;
+        else console.warn(`parseFinnhubQuote returned null for ${ticker}`, data);
       })
-      .catch(() => {});
+      .catch(e => console.error(`Finnhub fetch failed for ${ticker}:`, e));
   });
 
   await Promise.allSettled(fetches);
@@ -2257,7 +2263,8 @@ async function refreshAllPrices() {
   if (wasRateLimitedToday()) {
     showToast('Rate limit hit — wait a minute then try again', 'error');
   } else if (updated === 0) {
-    showToast('No prices updated — check your API key', 'error');
+    // Could be market closed (c:0), invalid key, or network issue
+    showToast('No prices returned — market may be closed or check API key in Settings', 'error');
   } else {
     showToast(`Updated ${updated}/${tickers.length} prices`, 'success');
   }
