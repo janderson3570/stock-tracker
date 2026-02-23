@@ -1028,6 +1028,12 @@
           </button>
         </div>
 
+        <!-- No-prices notice — shown when holdings exist but prices haven't loaded -->
+        <div id="no-prices-notice" style="display:none;align-items:center;gap:10px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:var(--radius);padding:11px 14px;margin-bottom:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div style="font-size:12px;color:#92400e">Live prices not yet loaded — tap <strong>Refresh</strong> to fetch current prices.</div>
+        </div>
+
         <!-- Holdings Table -->
         <div class="section-header">
           <div class="section-title">Holdings</div>
@@ -2370,6 +2376,13 @@ function setChangePeriod(p, btn) {
 function renderHome() {
   renderHomeKPIs();
   renderHoldingsTable();
+  // Show amber notice if we have holdings but no prices loaded for any of them
+  const notice = document.getElementById('no-prices-notice');
+  if (notice) {
+    const holdings = getHoldings();
+    const anyMissingPrice = holdings.length > 0 && holdings.some(h => h.currentPrice == null);
+    notice.style.display = anyMissingPrice ? 'flex' : 'none';
+  }
 }
 
 function renderHomeKPIs() {
@@ -2545,7 +2558,7 @@ function renderHoldingsTable() {
             <span class="ticker-shares">${fmtNum(h.shares,4)} shares</span>
           </div>
         </td>
-        <td class="right price-cell">${h.currentValue != null ? fmt$(h.currentValue) : '<span class="price-loading"></span>'}</td>
+        <td class="right price-cell">${h.currentValue != null ? fmt$(h.currentValue) : '<span style="color:var(--text3);font-size:12px">No price</span>'}</td>
         <td class="right price-cell">${fmt$(h.costBasis)}</td>
         <td class="right price-cell ${plSign}" style="font-weight:600">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</td>
         <td class="right">${changePill}</td>
@@ -2562,7 +2575,7 @@ function renderHoldingsTable() {
         </td>
         <td class="right price-cell">${fmtNum(h.shares,4)}</td>
         <td class="right price-cell">${fmt$(h.avgCost)}</td>
-        <td class="right price-cell">${h.currentPrice != null ? fmt$(h.currentPrice) : '<span class="price-loading"></span>'}</td>
+        <td class="right price-cell">${h.currentPrice != null ? fmt$(h.currentPrice) : '<span style="color:var(--text3);font-size:12px">No price</span>'}</td>
         <td class="right price-cell ${plSign}" style="font-weight:600">${plPct != null ? fmtPct(plPct) : '—'}</td>
         <td class="right">${changePill}</td>
       </tr>`;
@@ -3193,7 +3206,19 @@ async function syncFromSheets() {
         save();
         renderHome();
         updateSyncStatus('ok', 'Loaded from Sheets · ' + new Date().toLocaleTimeString());
-        showToast(`Loaded ${sheetTxs.length} transactions from Google Sheets`, 'success');
+
+        // Check if any holdings are missing cached prices
+        const tickers = [...new Set(sheetTxs.map(t => t.ticker))];
+        const missingPrices = tickers.filter(t => !state.prices[t]?.price);
+
+        if (missingPrices.length > 0 && state.settings.apiKey && !wasRateLimitedToday() && getRemainingQuota() > 0) {
+          showToast(`Loaded ${sheetTxs.length} transactions — fetching prices…`, 'success');
+          setTimeout(() => refreshAllPrices(), 600);
+        } else if (missingPrices.length > 0) {
+          showToast(`Loaded ${sheetTxs.length} transactions — tap Refresh to load prices`, 'success');
+        } else {
+          showToast(`Loaded ${sheetTxs.length} transactions from Google Sheets`, 'success');
+        }
       } else {
         showToast('Sheet connected but no valid transactions found', 'error');
       }
