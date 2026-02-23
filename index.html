@@ -1210,6 +1210,23 @@
         </div>
       </div>
 
+      <!-- News Feed Accounts -->
+      <div class="settings-section">
+        <div class="settings-section-title">News Feed Accounts</div>
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="settings-row-label">Twitter / X Accounts</div>
+          <div id="twitter-accounts-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px"></div>
+          <div style="display:flex;gap:8px">
+            <input class="settings-input-full" id="twitter-add-input" type="text"
+              placeholder="@username"
+              style="flex:1"
+              onkeydown="if(event.key==='Enter')addTwitterAccount()">
+            <button class="settings-btn primary" onclick="addTwitterAccount()" style="flex-shrink:0;white-space:nowrap">Add</button>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">Accounts appear as embedded feeds on the News tab.</div>
+        </div>
+      </div>
+
       <!-- Danger Zone -->
       <div class="settings-section">
         <div class="settings-section-title">Data</div>
@@ -1240,6 +1257,17 @@
       <div style="height:20px"></div>
     </div>
 
+    <!-- NEWS SCREEN -->
+    <div class="screen" id="screen-news">
+      <div class="page-content">
+        <div class="section-header">
+          <div class="section-title">News Feed</div>
+          <div id="news-account-count" style="font-size:12px;color:var(--text3)"></div>
+        </div>
+      </div>
+      <div id="news-feeds-container" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:20px"></div>
+    </div>
+
   </div><!-- end screen-container -->
 
   <!-- TAB BAR -->
@@ -1267,6 +1295,14 @@
         </svg>
       </div>
       <div class="tab-label">History</div>
+    </button>
+    <button class="tab-btn" id="tab-news" onclick="navigate('news')">
+      <div class="tab-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
+        </svg>
+      </div>
+      <div class="tab-label">News</div>
     </button>
     <button class="tab-btn" id="tab-settings" onclick="navigate('settings')">
       <div class="tab-icon">
@@ -1818,7 +1854,8 @@ let state = {
   settings: {
     sheetsUrl: 'https://script.google.com/macros/s/AKfycbwxq51qnAJkc6jtRq5IaohJsFnSR62tQSHH-eMBGahMhz2wvaGeX-8NIYjdcoKVZcSo/exec',
     apiKey: 'd6e7mt9r01qh94m3431gd6e7mt9r01qh94m34320',
-    lastRefresh: null
+    lastRefresh: null,
+    twitterAccounts: ['QuiverQuant', 'pelositracker']
   }
 };
 
@@ -1855,6 +1892,7 @@ function load() {
       const saved = JSON.parse(se);
       // Don't overwrite hard-coded defaults with blank saved values
       if (!saved.apiKey) saved.apiKey = state.settings.apiKey;
+      if (!saved.twitterAccounts) saved.twitterAccounts = state.settings.twitterAccounts;
       if (!saved.sheetsUrl) saved.sheetsUrl = state.settings.sheetsUrl;
       state.settings = { ...state.settings, ...saved };
     }
@@ -2423,6 +2461,13 @@ function navigate(screen, ticker) {
     document.getElementById('header-subtitle').style.display = 'none';
     addBtn.style.display = 'flex';
     renderHistory();
+
+  } else if (screen === 'news') {
+    document.getElementById('tab-news').classList.add('active');
+    document.getElementById('header-title').textContent = 'News';
+    document.getElementById('header-subtitle').style.display = 'none';
+    addBtn.style.display = 'none';
+    renderNews();
 
   } else if (screen === 'settings') {
     document.getElementById('tab-settings').classList.add('active');
@@ -3330,6 +3375,117 @@ function buildTxCard(tx, showEdit=false) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// RENDER NEWS
+// ═══════════════════════════════════════════════════════════════
+function renderNews() {
+  const accounts = state.settings.twitterAccounts || [];
+  const container = document.getElementById('news-feeds-container');
+  const countEl   = document.getElementById('news-account-count');
+  if (!container) return;
+
+  if (countEl) countEl.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+
+  if (!accounts.length) {
+    container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
+      <div class="icon">📰</div>
+      <h3>No accounts added</h3>
+      <p>Add Twitter accounts in Settings to see their feeds here</p>
+    </div>`;
+    return;
+  }
+
+  // Build a card per account with the Twitter embed widget
+  container.innerHTML = accounts.map(handle => `
+    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text)" style="flex-shrink:0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span style="font-weight:600;font-size:14px">@${handle}</span>
+        </div>
+        <a href="https://x.com/${handle}" target="_blank"
+           style="font-size:11px;color:var(--text3);text-decoration:none;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">
+          Open ↗
+        </a>
+      </div>
+      <div style="max-height:600px;overflow-y:auto;-webkit-overflow-scrolling:touch">
+        <a class="twitter-timeline"
+           data-height="600"
+           data-theme="light"
+           data-chrome="noheader nofooter noborders"
+           href="https://twitter.com/${handle}">
+          <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Loading @${handle}…</div>
+        </a>
+      </div>
+    </div>
+  `).join('');
+
+  // Load or re-run Twitter widget script
+  if (window.twttr && window.twttr.widgets) {
+    window.twttr.widgets.load(container);
+  } else if (!document.getElementById('twitter-widget-script')) {
+    const script = document.createElement('script');
+    script.id  = 'twitter-widget-script';
+    script.src = 'https://platform.twitter.com/widgets.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.twttr && window.twttr.widgets) window.twttr.widgets.load(container);
+    };
+    document.head.appendChild(script);
+  }
+}
+
+function addTwitterAccount() {
+  const input = document.getElementById('twitter-add-input');
+  if (!input) return;
+  let handle = input.value.trim().replace(/^@/, '');
+  if (!handle) return;
+  // Basic validation — alphanumeric + underscore only
+  if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) {
+    showToast('Invalid username — only letters, numbers, and underscores', 'error');
+    return;
+  }
+  if (!state.settings.twitterAccounts) state.settings.twitterAccounts = [];
+  if (state.settings.twitterAccounts.map(h => h.toLowerCase()).includes(handle.toLowerCase())) {
+    showToast('@' + handle + ' is already in your feed', 'error');
+    return;
+  }
+  state.settings.twitterAccounts.push(handle);
+  save();
+  input.value = '';
+  renderTwitterAccountsList();
+  showToast('@' + handle + ' added to News feed', 'success');
+}
+
+function removeTwitterAccount(handle) {
+  state.settings.twitterAccounts = (state.settings.twitterAccounts || []).filter(h => h !== handle);
+  save();
+  renderTwitterAccountsList();
+  showToast('@' + handle + ' removed', '');
+}
+
+function renderTwitterAccountsList() {
+  const el = document.getElementById('twitter-accounts-list');
+  if (!el) return;
+  const accounts = state.settings.twitterAccounts || [];
+  if (!accounts.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No accounts added yet</div>';
+    return;
+  }
+  el.innerHTML = accounts.map(handle => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:var(--radius-sm);padding:9px 12px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--text2)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        <span style="font-size:13px;font-weight:500">@${handle}</span>
+      </div>
+      <button onclick="removeTwitterAccount('${handle}')"
+        style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:2px 6px;font-family:var(--font);font-weight:500">
+        Remove
+      </button>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RENDER SETTINGS
 // ═══════════════════════════════════════════════════════════════
 function renderSettings() {
@@ -3344,6 +3500,7 @@ function renderSettings() {
     lastRef.textContent = new Date(state.settings.lastRefresh).toLocaleString();
   }
 
+  renderTwitterAccountsList();
   updateSyncStatus('idle');
 }
 
