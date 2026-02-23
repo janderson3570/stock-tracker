@@ -1641,7 +1641,7 @@ let state = {
   prices: {},       // {TICKER: {price, prevClose, open, week52H, week52L, mktCap, pe, name}}
   settings: {
     sheetsUrl: '',
-    apiKey: '',
+    apiKey: '7CEQOA1NBV1XNPB0',
     lastRefresh: null
   }
 };
@@ -1674,7 +1674,12 @@ function load() {
     const se = localStorage.getItem('st_settings');
     if (tx) state.transactions = JSON.parse(tx);
     if (pr) state.prices = JSON.parse(pr);
-    if (se) state.settings = { ...state.settings, ...JSON.parse(se) };
+    if (se) {
+      const saved = JSON.parse(se);
+      // Don't overwrite the hard-coded API key with a blank saved value
+      if (!saved.apiKey) saved.apiKey = state.settings.apiKey;
+      state.settings = { ...state.settings, ...saved };
+    }
   } catch(e) {}
 }
 
@@ -2788,10 +2793,23 @@ function showToast(msg, type='') {
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
+const REFRESH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+function shouldAutoRefresh() {
+  if (!state.settings.apiKey || !state.transactions.length) return false;
+  const lastActive = parseInt(localStorage.getItem('st_last_active') || '0');
+  const msSinceLast = Date.now() - lastActive;
+  return msSinceLast > REFRESH_COOLDOWN_MS;
+}
+
+function recordLastActive() {
+  localStorage.setItem('st_last_active', String(Date.now()));
+}
+
 function init() {
   load();
   navigate('home');
-  
+
   // Close autocomplete on outside click
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.autocomplete-wrap')) {
@@ -2806,10 +2824,26 @@ function init() {
     }
   });
 
-  // Auto-refresh prices every time the app opens (if API key set and have holdings)
-  if (state.settings.apiKey && state.transactions.length) {
+  // Track when the app goes to background so we know how long it was away
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      recordLastActive();
+    } else if (document.visibilityState === 'visible') {
+      // App came back to foreground — refresh only if away > 5 min
+      if (shouldAutoRefresh()) {
+        setTimeout(() => refreshAllPrices(), 800);
+      }
+    }
+  });
+
+  // On first open: refresh if no recent activity recorded
+  if (shouldAutoRefresh()) {
     setTimeout(() => refreshAllPrices(), 800);
   }
+
+  // Record now as active (covers the case where we never get a 'hidden' event)
+  window.addEventListener('beforeunload', recordLastActive);
+  recordLastActive();
 }
 
 init();
