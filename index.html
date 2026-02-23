@@ -1104,7 +1104,10 @@
               <span id="sync-status-text">Not configured</span>
             </div>
           </div>
-          <button class="settings-btn primary" onclick="syncNow()">Sync Now</button>
+          <div style="display:flex;gap:8px">
+            <button class="settings-btn primary" onclick="syncNow()" style="flex:1">&#8593; Push to Sheets</button>
+            <button class="settings-btn outline" onclick="syncFromSheets()" id="sync-from-sheets-btn" style="flex:1">&#8595; Load from Sheets</button>
+          </div>
         </div>
         <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
           <div class="settings-row-label">Apps Script URL</div>
@@ -3071,33 +3074,58 @@ async function syncInBackground() {
 async function syncFromSheets() {
   const url = state.settings.sheetsUrl;
   if (!url) return;
+
+  // Show loading state on the sync button if it exists
+  const syncBtn = document.getElementById('sync-from-sheets-btn');
+  if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Loading…'; }
+
   try {
-    const res = await fetch(url + '?action=read', { method: 'GET' });
-    const data = await res.json();
-    if (data.ok && data.data && data.data.length > 1) {
+    // Apps Script redirects GETs — must use redirect:'follow' and POST for reliability.
+    // We use POST with action=read to avoid redirect issues with cross-origin GETs.
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'read' }),
+      redirect: 'follow'
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) { throw new Error('Invalid JSON response: ' + text.substring(0, 100)); }
+
+    if (!data.ok) throw new Error('Sheet returned ok:false');
+
+    if (data.data && data.data.length > 1) {
       const sheetTxs = data.data.slice(1).map(r => ({
-        id: String(r[0]), ticker: r[1], type: r[2],
-        shares: parseFloat(r[3]), price: parseFloat(r[4]),
-        date: normalizeDate(r[5]),
+        id:        String(r[0]),
+        ticker:    String(r[1] || '').toUpperCase().trim(),
+        type:      String(r[2] || '').toLowerCase().trim(),
+        shares:    parseFloat(r[3]),
+        price:     parseFloat(r[4]),
+        date:      normalizeDate(r[5]),
         timestamp: parseInt(r[6])
-      })).filter(t => t.id && t.ticker && !isNaN(t.shares) && !isNaN(t.price));
+      })).filter(t => t.id && t.ticker && (t.type==='buy'||t.type==='sell') && !isNaN(t.shares) && !isNaN(t.price));
 
       if (sheetTxs.length > 0) {
         state.transactions = sheetTxs;
         state.transactions.sort((a, b) => b.timestamp - a.timestamp);
         save();
         renderHome();
+        updateSyncStatus('ok', 'Loaded from Sheets · ' + new Date().toLocaleTimeString());
         showToast(`Loaded ${sheetTxs.length} transactions from Google Sheets`, 'success');
-        // Now refresh prices for the loaded holdings
-        if (state.settings.apiKey) {
-          setTimeout(() => refreshAllPrices(), 800);
-        }
       } else {
-        showToast('Connected to Sheets — no transactions found yet', '');
+        showToast('Sheet connected but no valid transactions found', 'error');
       }
+    } else {
+      showToast('Sheet is empty — no transactions to load', '');
     }
   } catch(err) {
-    showToast('Could not load from Google Sheets', 'error');
+    console.error('syncFromSheets error:', err);
+    showToast('Could not load from Sheets: ' + err.message, 'error');
+  } finally {
+    if (syncBtn) { syncBtn.disabled = false; syncBtn.textContent = 'Load from Sheets'; }
   }
 }
 
@@ -3112,8 +3140,12 @@ async function syncNow() {
   const rows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
 
   try {
-    // First try to read from sheets
-    const readRes = await fetch(url + '?action=read', { method: 'GET' });
+    // First try to read from sheets — use POST to avoid redirect issues
+    const readRes = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'read' }),
+      redirect: 'follow'
+    });
     const readData = await readRes.json();
 
     if (readData.ok && readData.data && readData.data.length > 1) {
@@ -3468,9 +3500,10 @@ function init() {
   // Load the full Alpha Vantage stock listing for autocomplete (async, non-blocking)
   loadLiveListing();
 
-  // If we have a Sheets URL but no local transactions, auto-pull from Sheets.
-  if (state.settings.sheetsUrl && state.transactions.length === 0) {
-    showToast('Loading your data from Google Sheets…', '');
+  // Always pull from Sheets on startup to stay in sync across devices.
+  // We do this regardless of whether localStorage has data — Sheets is the source of truth.
+  if (state.settings.sheetsUrl) {
+    showToast('Syncing from Google Sheets…', '');
     syncFromSheets();
   }
 
