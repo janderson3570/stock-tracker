@@ -2881,6 +2881,31 @@ function copyAppsScript() {
   });
 }
 
+// Silent background sync — called automatically after every transaction change.
+// Saves locally first (already done before calling this), then pushes to Sheets quietly.
+// Only shows a toast if it fails. No merge/read needed — we just overwrite with our local state.
+async function syncInBackground() {
+  const url = state.settings.sheetsUrl;
+  if (!url) return; // not configured — silently skip
+  try {
+    const header = ['id','ticker','type','shares','price','date','timestamp'];
+    const rows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'write', rows })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      updateSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString());
+    } else {
+      throw new Error('Write failed');
+    }
+  } catch(err) {
+    updateSyncStatus('error', 'Auto-sync failed');
+    showToast('Sheet sync failed — tap Sync Now in Settings to retry', 'error');
+  }
+}
+
 async function syncNow() {
   const url = state.settings.sheetsUrl;
   if (!url) { showToast('Add your Apps Script URL in Settings', 'error'); return; }
@@ -3063,6 +3088,9 @@ function saveTransaction() {
   renderHome();
   showToast(`${currentTxType === 'buy' ? 'Bought' : 'Sold'} ${fmtNum(shares,4)} ${ticker}!`, 'success');
 
+  // Auto-sync to Google Sheets in background
+  syncInBackground();
+
   // Auto-fetch price if new ticker
   if (!state.prices[ticker] && state.settings.apiKey) {
     fetchPrice(ticker).then(data => {
@@ -3115,6 +3143,9 @@ function saveEditTransaction() {
   if (currentDetailTicker) renderDetail(currentDetailTicker);
   renderHistory();
   showToast('Transaction updated', 'success');
+
+  // Auto-sync to Google Sheets in background
+  syncInBackground();
 }
 
 function confirmDeleteTransaction() {
@@ -3127,6 +3158,9 @@ function confirmDeleteTransaction() {
     if (currentDetailTicker) renderDetail(currentDetailTicker);
     renderHistory();
     showToast('Transaction deleted', '');
+
+    // Auto-sync to Google Sheets in background
+    syncInBackground();
   }, true);
 }
 
