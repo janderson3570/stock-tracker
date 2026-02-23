@@ -54,15 +54,13 @@
   }
 
   #app {
-    /* Pin the whole app shell to the screen using fixed positioning.
-       This is the most reliable layout for iOS PWA / standalone mode.
-       We explicitly set all four edges so nothing can push the tab bar up. */
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     flex-direction: column;
-    /* Push content below the notch / Dynamic Island */
     padding-top: env(safe-area-inset-top, 0px);
+    /* Must clip children so flex layout fills exactly to bottom edge */
+    overflow: hidden;
   }
 
   /* ── HEADER ── */
@@ -123,18 +121,18 @@
   }
   .screen.active { display: block; }
 
-  /* ── TAB BAR ── */
+  /* ── TAB BAR ──
+     Height = 49px icons+labels + safe area bottom inset (home indicator on iPhone).
+     We use padding-bottom so the home indicator area stays blank below the labels.
+     The 0px fallback is intentional: on non-notched devices no extra space is needed. */
   .tab-bar {
     flex-shrink: 0;
     background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: flex-start;
-    padding-top: 10px;
-    /* safe-area-inset-bottom handles the iPhone home indicator.
-       The fixed #app already ends at the physical bottom edge,
-       so this padding just keeps tab labels from being obscured. */
-    padding-bottom: env(safe-area-inset-bottom, 12px);
+    padding-top: 8px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     z-index: 10;
   }
   .tab-btn {
@@ -146,7 +144,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0;
+    padding: 0 0 6px 0;
     transition: opacity 0.15s;
   }
   .tab-btn:active { opacity: 0.6; }
@@ -261,11 +259,13 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     margin-bottom: 16px;
+    position: relative;
   }
   .stocks-table {
     width: 100%;
-    min-width: 520px; /* forces horizontal scroll on narrow screens */
-    border-collapse: collapse;
+    min-width: 480px;
+    border-collapse: separate; /* needed for sticky to work with border-radius */
+    border-spacing: 0;
     font-size: 13px;
   }
   .stocks-table thead tr {
@@ -283,20 +283,31 @@
     cursor: pointer;
     user-select: none;
     transition: color 0.15s;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
   .stocks-table th:hover { color: var(--text); }
   .stocks-table th.sorted { color: var(--text); }
   .sort-arrow { margin-left: 3px; font-size: 9px; }
   .stocks-table th.right, .stocks-table td.right { text-align: right; }
+  /* Sticky first column */
+  .stocks-table th:first-child,
+  .stocks-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 2;
+    /* Thin right border to visually separate sticky col from scrolling cols */
+    box-shadow: 1px 0 0 var(--border);
+  }
+  .stocks-table tbody tr:active td:first-child { background: var(--surface2); }
   .stocks-table td {
     padding: 13px 12px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
   }
   .stocks-table tbody tr:last-child td { border-bottom: none; }
-  .stocks-table tbody tr {
-    transition: background 0.1s;
-  }
+  .stocks-table tbody tr { transition: background 0.1s; }
   .stocks-table tbody tr:active { background: var(--surface2); }
   .ticker-cell {
     display: flex;
@@ -2234,43 +2245,53 @@ function renderHoldingsTable() {
     return;
   }
 
-  // Define columns based on viewMode
+  // Define columns based on viewMode — Change col is now sortable
   const isTotal = viewMode === 'total';
   const cols = isTotal ? [
-    {key:'ticker', label:'Ticker', sortable:true},
-    {key:'currentValue', label:'Value', sortable:true, right:true},
-    {key:'costBasis', label:'Invested', sortable:true, right:true},
-    {key:'unrealized', label:'P&L', sortable:true, right:true},
-    {key:'change', label:'Change', sortable:false, right:true},
+    {key:'ticker',       label:'Ticker',   sortable:true},
+    {key:'currentValue', label:'Value',    sortable:true,  right:true},
+    {key:'costBasis',    label:'Invested', sortable:true,  right:true},
+    {key:'unrealized',   label:'P&L',      sortable:true,  right:true},
+    {key:'changePct1d',  label:'Change',   sortable:true,  right:true},
   ] : [
-    {key:'ticker', label:'Ticker', sortable:true},
-    {key:'shares', label:'Shares', sortable:true, right:true},
-    {key:'avgCost', label:'Avg Cost', sortable:true, right:true},
-    {key:'currentPrice', label:'Price', sortable:true, right:true},
-    {key:'unrealizedPct', label:'P&L%', sortable:true, right:true},
-    {key:'change', label:'Change', sortable:false, right:true},
+    {key:'ticker',       label:'Ticker',   sortable:true},
+    {key:'shares',       label:'Shares',   sortable:true,  right:true},
+    {key:'avgCost',      label:'Avg Cost', sortable:true,  right:true},
+    {key:'currentPrice', label:'Price',    sortable:true,  right:true},
+    {key:'unrealizedPct',label:'P&L%',     sortable:true,  right:true},
+    {key:'changePct1d',  label:'Change',   sortable:true,  right:true},
   ];
 
+  // Attach changePct1d to each holding for sorting
+  const holdingsWithChange = holdings.map(h => {
+    const ch = getPriceChange(h.ticker, changePeriod);
+    return { ...h, changePct1d: ch ? ch.pct : null, changeAmt1d: ch ? ch.amt : null };
+  });
+
   thead.innerHTML = cols.map(c => `
-    <th class="${c.right?'right':''} ${sortCol===c.key?'sorted':''}" 
+    <th class="${c.right?'right':''} ${sortCol===c.key?'sorted':''}"
         ${c.sortable ? `onclick="sortTable('${c.key}')"` : ''}>
-      ${c.label}${c.sortable && sortCol===c.key ? `<span class="sort-arrow">${sortDir===1?'↑':'↓'}</span>` : ''}
+      ${c.label}${c.sortable && sortCol===c.key ? `<span class="sort-arrow">${sortDir===1?'↓':'↑'}</span>` : ''}
     </th>`).join('');
 
-  // Sort
-  let sorted = [...holdings];
-  sorted.sort((a,b) => {
+  // Sort — default direction is DESCENDING (highest value first) for numeric cols
+  let sorted = [...holdingsWithChange];
+  sorted.sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
-    if (sortCol === 'ticker') return sortDir * va.localeCompare(vb);
-    if (va == null) va = -Infinity;
-    if (vb == null) vb = -Infinity;
-    return sortDir * (va - vb);
+    if (sortCol === 'ticker') {
+      // Ticker sorts A→Z ascending (dir=1), Z→A descending (dir=-1)
+      return sortDir * (va || '').localeCompare(vb || '');
+    }
+    // Numeric: nulls always go to bottom regardless of direction
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return sortDir * (vb - va); // note: vb-va so dir=1 = descending (high→low)
   });
 
   tbody.innerHTML = sorted.map(h => {
-    const change = getPriceChange(h.ticker, changePeriod);
-    const changePill = change
-      ? `<span class="change-pill ${signClass(change.amt)}">${change.amt >= 0 ? '+' : ''}${change.pct?.toFixed(2)}%</span>`
+    const changePill = h.changePct1d != null
+      ? `<span class="change-pill ${signClass(h.changeAmt1d)}">${h.changeAmt1d >= 0 ? '+' : ''}${h.changePct1d?.toFixed(2)}%</span>`
       : `<span class="change-pill neutral">N/A</span>`;
 
     if (isTotal) {
@@ -2284,11 +2305,12 @@ function renderHoldingsTable() {
         </td>
         <td class="right price-cell">${h.currentValue != null ? fmt$(h.currentValue) : '<span class="price-loading"></span>'}</td>
         <td class="right price-cell">${fmt$(h.costBasis)}</td>
-        <td class="right price-cell ${plSign}">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</td>
+        <td class="right price-cell ${plSign}" style="font-weight:600">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</td>
         <td class="right">${changePill}</td>
       </tr>`;
     } else {
       const plPct = h.unrealizedPct;
+      const plSign = plPct != null ? signClass(plPct) : '';
       return `<tr onclick="navigate('detail','${h.ticker}')">
         <td>
           <div class="ticker-cell">
@@ -2299,7 +2321,7 @@ function renderHoldingsTable() {
         <td class="right price-cell">${fmtNum(h.shares,4)}</td>
         <td class="right price-cell">${fmt$(h.avgCost)}</td>
         <td class="right price-cell">${h.currentPrice != null ? fmt$(h.currentPrice) : '<span class="price-loading"></span>'}</td>
-        <td class="right price-cell ${plPct != null ? signClass(plPct) : ''}">${plPct != null ? fmtPct(plPct) : '—'}</td>
+        <td class="right price-cell ${plSign}" style="font-weight:600">${plPct != null ? fmtPct(plPct) : '—'}</td>
         <td class="right">${changePill}</td>
       </tr>`;
     }
@@ -2307,8 +2329,13 @@ function renderHoldingsTable() {
 }
 
 function sortTable(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
+  if (sortCol === col) {
+    sortDir *= -1;
+  } else {
+    sortCol = col;
+    // Ticker defaults ascending (A first); all numeric cols default descending (highest first)
+    sortDir = col === 'ticker' ? 1 : 1;
+  }
   renderHoldingsTable();
 }
 
@@ -2526,7 +2553,7 @@ function drawChart(data) {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   const W = rect.width || canvas.parentElement.offsetWidth;
-  const H = 160;
+  const H = 210; // taller to give room for axes
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   canvas.style.width = W + 'px';
@@ -2537,22 +2564,98 @@ function drawChart(data) {
   ctx.clearRect(0, 0, W, H);
 
   const prices = data.map(d => d.price);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-  const pad = { top: 16, right: 16, bottom: 24, left: 12 };
+  const rawMin = Math.min(...prices);
+  const rawMax = Math.max(...prices);
+  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
+
+  // Nice Y axis: expand range by 10% top and bottom, snap to round numbers
+  const niceMin = rawMin - rawRange * 0.08;
+  const niceMax = rawMax + rawRange * 0.08;
+  const niceRange = niceMax - niceMin;
+
+  // Padding: left wider for Y labels
+  const pad = { top: 12, right: 12, bottom: 36, left: 58 };
   const cw = W - pad.left - pad.right;
   const ch = H - pad.top - pad.bottom;
 
-  const toX = i => pad.left + (i / (data.length - 1)) * cw;
-  const toY = v => pad.top + ch - ((v - min) / range) * ch;
+  const toX = i => pad.left + (i / Math.max(data.length - 1, 1)) * cw;
+  const toY = v => pad.top + ch - ((v - niceMin) / niceRange) * ch;
 
-  // Determine color (green if end > start)
+  // Color
   const isUp = prices[prices.length-1] >= prices[0];
   const lineColor = isUp ? '#1a9e5c' : '#d63b3b';
-  const fillColor = isUp ? 'rgba(26,158,92,0.08)' : 'rgba(214,59,59,0.08)';
+  const fillColor = isUp ? 'rgba(26,158,92,0.07)' : 'rgba(214,59,59,0.07)';
+  const gridColor = 'rgba(0,0,0,0.06)';
+  const labelColor = '#9b9b93';
+  const fontSize = 10;
 
-  // Fill
+  // ── Y axis grid lines and labels (4 lines) ──
+  ctx.font = `${fontSize}px 'DM Mono', monospace`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const v = niceMin + (niceRange * i / yTicks);
+    const y = toY(v);
+    // Grid line
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = labelColor;
+    const label = v >= 1000 ? '$' + (v/1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : v < 100 ? 2 : 0);
+    ctx.fillText(label, pad.left - 5, y);
+  }
+
+  // ── X axis labels (smart date formatting based on data span) ──
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const xTickCount = Math.min(5, data.length);
+  const xStep = Math.floor((data.length - 1) / (xTickCount - 1)) || 1;
+  for (let i = 0; i < data.length; i += xStep) {
+    if (i >= data.length) break;
+    const d = new Date(data[i].date + 'T00:00:00');
+    const spanDays = data.length;
+    let label;
+    if (spanDays <= 7)        label = d.toLocaleDateString('en-US',{weekday:'short'});
+    else if (spanDays <= 60)  label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else if (spanDays <= 400) label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    else                      label = d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const x = toX(i);
+    // Tick mark
+    ctx.beginPath();
+    ctx.moveTo(x, H - pad.bottom);
+    ctx.lineTo(x, H - pad.bottom + 4);
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = labelColor;
+    ctx.fillText(label, x, H - pad.bottom + 6);
+  }
+  // Also always label the last point
+  const lastIdx = data.length - 1;
+  if (lastIdx % xStep !== 0) {
+    const d = new Date(data[lastIdx].date + 'T00:00:00');
+    const spanDays = data.length;
+    let label = spanDays <= 400
+      ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      : d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    ctx.fillStyle = labelColor;
+    ctx.fillText(label, toX(lastIdx), H - pad.bottom + 6);
+  }
+
+  // ── Baseline (X axis line) ──
+  ctx.beginPath();
+  ctx.moveTo(pad.left, H - pad.bottom);
+  ctx.lineTo(W - pad.right, H - pad.bottom);
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ── Fill under line ──
   ctx.beginPath();
   ctx.moveTo(toX(0), toY(prices[0]));
   for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
@@ -2562,24 +2665,73 @@ function drawChart(data) {
   ctx.fillStyle = fillColor;
   ctx.fill();
 
-  // Line
+  // ── Price line ──
   ctx.beginPath();
   ctx.moveTo(toX(0), toY(prices[0]));
   for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Touch/hover interaction
+  // ── Current price dot at end ──
+  const lastX = toX(data.length - 1);
+  const lastY = toY(prices[data.length - 1]);
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+
+  // ── Touch/hover crosshair ──
+  let crosshairIdx = -1;
+  function drawCrosshair(idx) {
+    if (idx < 0 || idx >= data.length) return;
+    crosshairIdx = idx;
+    drawChart._baseImageData = drawChart._baseImageData; // placeholder
+    const cx = toX(idx);
+    const cy = toY(prices[idx]);
+    // Vertical dashed line
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(cx, pad.top);
+    ctx.lineTo(cx, H - pad.bottom);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+    // Dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+
+  // Save clean frame for redraw on hover
+  const cleanImage = canvas.toDataURL();
+
   canvas.ontouchmove = canvas.onmousemove = (e) => {
+    e.preventDefault();
     const bounds = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const x = clientX - bounds.left;
-    const idx = Math.round(((x - pad.left) / cw) * (data.length-1));
-    if (idx < 0 || idx >= data.length) return;
+    const idx = Math.max(0, Math.min(data.length - 1, Math.round(((x - pad.left) / cw) * (data.length - 1))));
+    // Redraw from clean image then overlay crosshair
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(img, 0, 0, W, H);
+      drawCrosshair(idx);
+    };
+    img.src = cleanImage;
     const pt = data[idx];
-    showChartTooltip(`${pt.date}  ${fmt$(pt.price)}`, clientX, bounds.top - 40);
+    showChartTooltip(`${pt.date}  ${fmt$(pt.price)}`, clientX, clientY - 36);
   };
   canvas.ontouchend = canvas.onmouseleave = () => {
     document.getElementById('chart-tooltip').style.opacity = '0';
