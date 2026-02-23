@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Stock Tracker">
@@ -40,7 +40,7 @@
     --mono: 'DM Mono', monospace;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   
   html, body {
     height: 100%; width: 100%;
@@ -49,15 +49,17 @@
     color: var(--text);
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
   }
 
   #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    height: -webkit-fill-available;
-    padding-top: var(--safe-top);
-    padding-bottom: var(--safe-bottom);
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    /* Account for safe areas on notched iPhones */
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   /* ── HEADER ── */
@@ -119,12 +121,15 @@
   /* ── TAB BAR ── */
   .tab-bar {
     flex-shrink: 0;
-    height: var(--tab-height);
     background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: flex-start;
     padding-top: 10px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Ensure it sits at the absolute bottom */
+    position: relative;
+    z-index: 10;
   }
   .tab-btn {
     flex: 1;
@@ -135,8 +140,9 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0;
+    padding: 0 0 10px 0;
     transition: opacity 0.15s;
+    min-height: 52px;
   }
   .tab-btn:active { opacity: 0.6; }
   .tab-icon {
@@ -978,6 +984,12 @@
           </div>
         </div>
 
+        <!-- Last Refreshed -->
+        <div id="last-refresh-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:-4px">
+          <div style="font-size:11px;color:var(--text3)" id="home-last-refresh">Prices not yet refreshed</div>
+          <button onclick="refreshAllPrices()" style="font-size:11px;color:var(--text2);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;padding:4px 0">↻ Refresh</button>
+        </div>
+
         <!-- Holdings Table -->
         <div class="section-header">
           <div class="section-title">Holdings</div>
@@ -1287,84 +1299,339 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// STOCK DATABASE (common tickers for autocomplete)
+// STOCK DATABASE — 500+ tickers (S&P 500, popular ETFs, crypto ETFs)
 // ═══════════════════════════════════════════════════════════════
 const STOCK_DB = [
-  {t:'AAPL',n:'Apple Inc.'},
-  {t:'MSFT',n:'Microsoft Corporation'},
-  {t:'GOOGL',n:'Alphabet Inc. (Class A)'},
-  {t:'GOOG',n:'Alphabet Inc. (Class C)'},
-  {t:'AMZN',n:'Amazon.com Inc.'},
-  {t:'NVDA',n:'NVIDIA Corporation'},
-  {t:'META',n:'Meta Platforms Inc.'},
-  {t:'TSLA',n:'Tesla Inc.'},
-  {t:'BRK.B',n:'Berkshire Hathaway Inc.'},
-  {t:'LLY',n:'Eli Lilly and Company'},
-  {t:'JPM',n:'JPMorgan Chase & Co.'},
-  {t:'V',n:'Visa Inc.'},
-  {t:'XOM',n:'Exxon Mobil Corporation'},
-  {t:'UNH',n:'UnitedHealth Group Inc.'},
-  {t:'JNJ',n:'Johnson & Johnson'},
-  {t:'WMT',n:'Walmart Inc.'},
-  {t:'MA',n:'Mastercard Inc.'},
-  {t:'PG',n:'Procter & Gamble Co.'},
-  {t:'AVGO',n:'Broadcom Inc.'},
-  {t:'HD',n:'The Home Depot Inc.'},
-  {t:'CVX',n:'Chevron Corporation'},
-  {t:'MRK',n:'Merck & Co. Inc.'},
-  {t:'ABBV',n:'AbbVie Inc.'},
-  {t:'COST',n:'Costco Wholesale Corporation'},
-  {t:'ORCL',n:'Oracle Corporation'},
-  {t:'AMD',n:'Advanced Micro Devices Inc.'},
-  {t:'NFLX',n:'Netflix Inc.'},
-  {t:'ADBE',n:'Adobe Inc.'},
-  {t:'CRM',n:'Salesforce Inc.'},
-  {t:'INTC',n:'Intel Corporation'},
-  {t:'QCOM',n:'Qualcomm Inc.'},
-  {t:'TXN',n:'Texas Instruments Inc.'},
-  {t:'INTU',n:'Intuit Inc.'},
-  {t:'PFE',n:'Pfizer Inc.'},
-  {t:'BA',n:'Boeing Company'},
-  {t:'CAT',n:'Caterpillar Inc.'},
-  {t:'GS',n:'Goldman Sachs Group Inc.'},
-  {t:'MS',n:'Morgan Stanley'},
-  {t:'AMGN',n:'Amgen Inc.'},
-  {t:'SBUX',n:'Starbucks Corporation'},
-  {t:'IBM',n:'International Business Machines'},
-  {t:'GE',n:'GE Aerospace'},
-  {t:'DIS',n:'The Walt Disney Company'},
-  {t:'T',n:'AT&T Inc.'},
-  {t:'VZ',n:'Verizon Communications Inc.'},
-  {t:'KO',n:'The Coca-Cola Company'},
-  {t:'PEP',n:'PepsiCo Inc.'},
-  {t:'MCD',n:'McDonald\'s Corporation'},
-  {t:'NKE',n:'Nike Inc.'},
-  {t:'UBER',n:'Uber Technologies Inc.'},
-  {t:'LYFT',n:'Lyft Inc.'},
-  {t:'ABNB',n:'Airbnb Inc.'},
-  {t:'SNAP',n:'Snap Inc.'},
-  {t:'SPOT',n:'Spotify Technology SA'},
-  {t:'PYPL',n:'PayPal Holdings Inc.'},
-  {t:'SQ',n:'Block Inc.'},
-  {t:'COIN',n:'Coinbase Global Inc.'},
-  {t:'PLTR',n:'Palantir Technologies Inc.'},
-  {t:'RBLX',n:'Roblox Corporation'},
-  {t:'HOOD',n:'Robinhood Markets Inc.'},
-  {t:'RIVN',n:'Rivian Automotive Inc.'},
-  {t:'LCID',n:'Lucid Group Inc.'},
-  {t:'F',n:'Ford Motor Company'},
-  {t:'GM',n:'General Motors Company'},
-  {t:'SPY',n:'SPDR S&P 500 ETF Trust'},
-  {t:'QQQ',n:'Invesco QQQ Trust'},
-  {t:'IWM',n:'iShares Russell 2000 ETF'},
-  {t:'VTI',n:'Vanguard Total Stock Market ETF'},
-  {t:'VOO',n:'Vanguard S&P 500 ETF'},
-  {t:'VGT',n:'Vanguard Information Technology ETF'},
-  {t:'ARKK',n:'ARK Innovation ETF'},
-  {t:'GLD',n:'SPDR Gold Shares'},
-  {t:'SLV',n:'iShares Silver Trust'},
-  {t:'BTC',n:'Bitcoin'},
+  // Mega-cap / most traded
+  {t:'AAPL',n:'Apple Inc.'},{t:'MSFT',n:'Microsoft Corporation'},{t:'NVDA',n:'NVIDIA Corporation'},
+  {t:'GOOGL',n:'Alphabet Inc. (Class A)'},{t:'GOOG',n:'Alphabet Inc. (Class C)'},{t:'AMZN',n:'Amazon.com Inc.'},
+  {t:'META',n:'Meta Platforms Inc.'},{t:'TSLA',n:'Tesla Inc.'},{t:'BRK.B',n:'Berkshire Hathaway Inc.'},
+  {t:'BRK.A',n:'Berkshire Hathaway Inc. (A)'},{t:'LLY',n:'Eli Lilly and Company'},{t:'JPM',n:'JPMorgan Chase & Co.'},
+  {t:'V',n:'Visa Inc.'},{t:'XOM',n:'Exxon Mobil Corporation'},{t:'UNH',n:'UnitedHealth Group Inc.'},
+  {t:'AVGO',n:'Broadcom Inc.'},{t:'MA',n:'Mastercard Inc.'},{t:'JNJ',n:'Johnson & Johnson'},
+  {t:'PG',n:'Procter & Gamble Co.'},{t:'HD',n:'The Home Depot Inc.'},{t:'COST',n:'Costco Wholesale Corporation'},
+  {t:'MRK',n:'Merck & Co. Inc.'},{t:'ABBV',n:'AbbVie Inc.'},{t:'CVX',n:'Chevron Corporation'},
+  {t:'ORCL',n:'Oracle Corporation'},{t:'AMD',n:'Advanced Micro Devices Inc.'},{t:'NFLX',n:'Netflix Inc.'},
+  {t:'ADBE',n:'Adobe Inc.'},{t:'CRM',n:'Salesforce Inc.'},{t:'WMT',n:'Walmart Inc.'},
+  // Tech
+  {t:'INTC',n:'Intel Corporation'},{t:'QCOM',n:'Qualcomm Inc.'},{t:'TXN',n:'Texas Instruments Inc.'},
+  {t:'INTU',n:'Intuit Inc.'},{t:'IBM',n:'International Business Machines'},{t:'AMAT',n:'Applied Materials Inc.'},
+  {t:'MU',n:'Micron Technology Inc.'},{t:'LRCX',n:'Lam Research Corporation'},{t:'KLAC',n:'KLA Corporation'},
+  {t:'MRVL',n:'Marvell Technology Inc.'},{t:'SNPS',n:'Synopsys Inc.'},{t:'CDNS',n:'Cadence Design Systems'},
+  {t:'FTNT',n:'Fortinet Inc.'},{t:'PANW',n:'Palo Alto Networks Inc.'},{t:'CRWD',n:'CrowdStrike Holdings'},
+  {t:'ZS',n:'Zscaler Inc.'},{t:'OKTA',n:'Okta Inc.'},{t:'DDOG',n:'Datadog Inc.'},
+  {t:'SNOW',n:'Snowflake Inc.'},{t:'MDB',n:'MongoDB Inc.'},{t:'NET',n:'Cloudflare Inc.'},
+  {t:'TWLO',n:'Twilio Inc.'},{t:'SHOP',n:'Shopify Inc.'},{t:'HUBS',n:'HubSpot Inc.'},
+  {t:'TEAM',n:'Atlassian Corporation'},{t:'WDAY',n:'Workday Inc.'},{t:'NOW',n:'ServiceNow Inc.'},
+  {t:'VEEV',n:'Veeva Systems Inc.'},{t:'ZM',n:'Zoom Video Communications'},{t:'DOCU',n:'DocuSign Inc.'},
+  {t:'ESTC',n:'Elastic N.V.'},{t:'GTLB',n:'GitLab Inc.'},{t:'PATH',n:'UiPath Inc.'},
+  {t:'AI',n:'C3.ai Inc.'},{t:'BBAI',n:'BigBear.ai Holdings'},{t:'SOUN',n:'SoundHound AI'},
+  {t:'IONQ',n:'IonQ Inc.'},{t:'RGTI',n:'Rigetti Computing'},{t:'QUBT',n:'Quantum Computing Inc.'},
+  {t:'MSCI',n:'MSCI Inc.'},{t:'ANSS',n:'Ansys Inc.'},{t:'PTC',n:'PTC Inc.'},
+  {t:'EPAM',n:'EPAM Systems Inc.'},{t:'CTSH',n:'Cognizant Technology Solutions'},{t:'ACN',n:'Accenture plc'},
+  {t:'WIT',n:'Wipro Limited'},{t:'INFY',n:'Infosys Limited'},{t:'HCL',n:'HCL Technologies'},
+  // Semiconductors
+  {t:'TSM',n:'Taiwan Semiconductor Manufacturing'},{t:'ASML',n:'ASML Holding N.V.'},
+  {t:'ADI',n:'Analog Devices Inc.'},{t:'NXPI',n:'NXP Semiconductors N.V.'},
+  {t:'MCHP',n:'Microchip Technology Inc.'},{t:'ON',n:'ON Semiconductor Corporation'},
+  {t:'WOLF',n:'Wolfspeed Inc.'},{t:'SWKS',n:'Skyworks Solutions Inc.'},
+  {t:'QRVO',n:'Qorvo Inc.'},{t:'MPWR',n:'Monolithic Power Systems'},
+  {t:'SMCI',n:'Super Micro Computer Inc.'},{t:'DELL',n:'Dell Technologies Inc.'},
+  {t:'HPQ',n:'HP Inc.'},{t:'HPE',n:'Hewlett Packard Enterprise'},
+  {t:'STX',n:'Seagate Technology Holdings'},{t:'WDC',n:'Western Digital Corporation'},
+  // Communication
+  {t:'T',n:'AT&T Inc.'},{t:'VZ',n:'Verizon Communications Inc.'},{t:'TMUS',n:'T-Mobile US Inc.'},
+  {t:'CHTR',n:'Charter Communications Inc.'},{t:'CMCSA',n:'Comcast Corporation'},
+  {t:'DIS',n:'The Walt Disney Company'},{t:'PARA',n:'Paramount Global'},
+  {t:'WBD',n:'Warner Bros. Discovery'},{t:'NWSA',n:'News Corp (Class A)'},
+  {t:'FOX',n:'Fox Corporation (Class B)'},{t:'FOXA',n:'Fox Corporation (Class A)'},
+  {t:'SIRI',n:'Sirius XM Holdings Inc.'},{t:'SPOT',n:'Spotify Technology SA'},
+  {t:'SNAP',n:'Snap Inc.'},{t:'PINS',n:'Pinterest Inc.'},{t:'RDDT',n:'Reddit Inc.'},
+  {t:'MTCH',n:'Match Group Inc.'},{t:'IAC',n:'IAC Inc.'},{t:'ZG',n:'Zillow Group Inc.'},
+  // Financials
+  {t:'GS',n:'Goldman Sachs Group Inc.'},{t:'MS',n:'Morgan Stanley'},{t:'BAC',n:'Bank of America Corporation'},
+  {t:'WFC',n:'Wells Fargo & Company'},{t:'C',n:'Citigroup Inc.'},{t:'USB',n:'U.S. Bancorp'},
+  {t:'PNC',n:'PNC Financial Services Group'},{t:'TFC',n:'Truist Financial Corporation'},
+  {t:'COF',n:'Capital One Financial Corporation'},{t:'AXP',n:'American Express Company'},
+  {t:'DFS',n:'Discover Financial Services'},{t:'SYF',n:'Synchrony Financial'},
+  {t:'BK',n:'Bank of New York Mellon'},{t:'STT',n:'State Street Corporation'},
+  {t:'SCHW',n:'Charles Schwab Corporation'},{t:'RJF',n:'Raymond James Financial'},
+  {t:'IVZ',n:'Invesco Ltd.'},{t:'BLK',n:'BlackRock Inc.'},{t:'BX',n:'Blackstone Inc.'},
+  {t:'KKR',n:'KKR & Co. Inc.'},{t:'APO',n:'Apollo Global Management'},
+  {t:'ARES',n:'Ares Management Corporation'},{t:'CG',n:'Carlyle Group Inc.'},
+  {t:'BAM',n:'Brookfield Asset Management'},{t:'TROW',n:'T. Rowe Price Group'},
+  {t:'AMP',n:'Ameriprise Financial Inc.'},{t:'LNC',n:'Lincoln National Corporation'},
+  {t:'PRU',n:'Prudential Financial Inc.'},{t:'MET',n:'MetLife Inc.'},
+  {t:'AFL',n:'Aflac Incorporated'},{t:'AIG',n:'American International Group'},
+  {t:'TRV',n:'The Travelers Companies Inc.'},{t:'PGR',n:'Progressive Corporation'},
+  {t:'ALL',n:'Allstate Corporation'},{t:'CB',n:'Chubb Limited'},
+  {t:'MMC',n:'Marsh & McLennan Companies'},{t:'AON',n:'Aon plc'},
+  {t:'WTW',n:'Willis Towers Watson'},{t:'SPGI',n:'S&P Global Inc.'},
+  {t:'MCO',n:'Moody\'s Corporation'},{t:'ICE',n:'Intercontinental Exchange'},
+  {t:'CME',n:'CME Group Inc.'},{t:'NDAQ',n:'Nasdaq Inc.'},{t:'CBOE',n:'Cboe Global Markets'},
+  {t:'PYPL',n:'PayPal Holdings Inc.'},{t:'SQ',n:'Block Inc.'},{t:'AFRM',n:'Affirm Holdings Inc.'},
+  {t:'SOFI',n:'SoFi Technologies Inc.'},{t:'UPST',n:'Upstart Holdings Inc.'},
+  {t:'LC',n:'LendingClub Corporation'},{t:'GPN',n:'Global Payments Inc.'},
+  {t:'FIS',n:'Fidelity National Information Services'},{t:'FI',n:'Fiserv Inc.'},
+  {t:'V',n:'Visa Inc.'},{t:'MA',n:'Mastercard Inc.'},
+  // Healthcare
+  {t:'PFE',n:'Pfizer Inc.'},{t:'BMY',n:'Bristol-Myers Squibb Company'},
+  {t:'GILD',n:'Gilead Sciences Inc.'},{t:'AMGN',n:'Amgen Inc.'},
+  {t:'BIIB',n:'Biogen Inc.'},{t:'VRTX',n:'Vertex Pharmaceuticals'},
+  {t:'REGN',n:'Regeneron Pharmaceuticals'},{t:'MRNA',n:'Moderna Inc.'},
+  {t:'BNTX',n:'BioNTech SE'},{t:'AZN',n:'AstraZeneca plc'},
+  {t:'NVO',n:'Novo Nordisk A/S'},{t:'SNY',n:'Sanofi SA'},
+  {t:'NVS',n:'Novartis AG'},{t:'RHHBY',n:'Roche Holding AG'},
+  {t:'ABT',n:'Abbott Laboratories'},{t:'MDT',n:'Medtronic plc'},
+  {t:'BSX',n:'Boston Scientific Corporation'},{t:'SYK',n:'Stryker Corporation'},
+  {t:'EW',n:'Edwards Lifesciences Corporation'},{t:'ISRG',n:'Intuitive Surgical Inc.'},
+  {t:'DXCM',n:'DexCom Inc.'},{t:'PODD',n:'Insulet Corporation'},
+  {t:'HOLX',n:'Hologic Inc.'},{t:'BDX',n:'Becton Dickinson and Company'},
+  {t:'BAX',n:'Baxter International Inc.'},{t:'ZBH',n:'Zimmer Biomet Holdings'},
+  {t:'ALGN',n:'Align Technology Inc.'},{t:'IDXX',n:'IDEXX Laboratories Inc.'},
+  {t:'IQV',n:'IQVIA Holdings Inc.'},{t:'CRL',n:'Charles River Laboratories'},
+  {t:'TMO',n:'Thermo Fisher Scientific Inc.'},{t:'DHR',n:'Danaher Corporation'},
+  {t:'A',n:'Agilent Technologies Inc.'},{t:'MTD',n:'Mettler-Toledo International'},
+  {t:'WAT',n:'Waters Corporation'},{t:'TECH',n:'Bio-Techne Corporation'},
+  {t:'ILMN',n:'Illumina Inc.'},{t:'PACB',n:'Pacific Biosciences'},
+  {t:'CVS',n:'CVS Health Corporation'},{t:'MCK',n:'McKesson Corporation'},
+  {t:'ABC',n:'AmerisourceBergen Corporation'},{t:'CAH',n:'Cardinal Health Inc.'},
+  {t:'HCA',n:'HCA Healthcare Inc.'},{t:'THC',n:'Tenet Healthcare Corporation'},
+  {t:'CNC',n:'Centene Corporation'},{t:'MOH',n:'Molina Healthcare Inc.'},
+  {t:'HUM',n:'Humana Inc.'},{t:'CI',n:'Cigna Group'},
+  {t:'ELV',n:'Elevance Health Inc.'},{t:'UNH',n:'UnitedHealth Group Inc.'},
+  // Consumer Discretionary
+  {t:'AMZN',n:'Amazon.com Inc.'},{t:'TSLA',n:'Tesla Inc.'},
+  {t:'HD',n:'The Home Depot Inc.'},{t:'LOW',n:'Lowe\'s Companies Inc.'},
+  {t:'NKE',n:'Nike Inc.'},{t:'LULU',n:'Lululemon Athletica Inc.'},
+  {t:'DECK',n:'Deckers Outdoor Corporation'},{t:'SKX',n:'Skechers U.S.A. Inc.'},
+  {t:'PVH',n:'PVH Corp.'},{t:'RL',n:'Ralph Lauren Corporation'},
+  {t:'TPR',n:'Tapestry Inc.'},{t:'CPRI',n:'Capri Holdings Limited'},
+  {t:'MCD',n:'McDonald\'s Corporation'},{t:'SBUX',n:'Starbucks Corporation'},
+  {t:'CMG',n:'Chipotle Mexican Grill Inc.'},{t:'YUM',n:'Yum! Brands Inc.'},
+  {t:'DPZ',n:'Domino\'s Pizza Inc.'},{t:'QSR',n:'Restaurant Brands International'},
+  {t:'DKNG',n:'DraftKings Inc.'},{t:'MGM',n:'MGM Resorts International'},
+  {t:'WYNN',n:'Wynn Resorts Limited'},{t:'LVS',n:'Las Vegas Sands Corp.'},
+  {t:'NCLH',n:'Norwegian Cruise Line Holdings'},{t:'CCL',n:'Carnival Corporation'},
+  {t:'RCL',n:'Royal Caribbean Cruises Ltd.'},{t:'EXPE',n:'Expedia Group Inc.'},
+  {t:'BKNG',n:'Booking Holdings Inc.'},{t:'ABNB',n:'Airbnb Inc.'},
+  {t:'UBER',n:'Uber Technologies Inc.'},{t:'LYFT',n:'Lyft Inc.'},
+  {t:'DASH',n:'DoorDash Inc.'},{t:'GRUB',n:'Grubhub Inc.'},
+  {t:'W',n:'Wayfair Inc.'},{t:'ETSY',n:'Etsy Inc.'},
+  {t:'EBAY',n:'eBay Inc.'},{t:'RVLV',n:'Revolve Group Inc.'},
+  {t:'TGT',n:'Target Corporation'},{t:'WMT',n:'Walmart Inc.'},
+  {t:'COST',n:'Costco Wholesale Corporation'},{t:'BJ',n:'BJ\'s Wholesale Club Holdings'},
+  {t:'DG',n:'Dollar General Corporation'},{t:'DLTR',n:'Dollar Tree Inc.'},
+  {t:'FIVE',n:'Five Below Inc.'},{t:'OLLI',n:'Ollie\'s Bargain Outlet Holdings'},
+  {t:'TJX',n:'TJX Companies Inc.'},{t:'ROST',n:'Ross Stores Inc.'},
+  {t:'GPS',n:'Gap Inc.'},{t:'ANF',n:'Abercrombie & Fitch Co.'},
+  {t:'AEO',n:'American Eagle Outfitters'},{t:'FL',n:'Foot Locker Inc.'},
+  {t:'KSS',n:'Kohl\'s Corporation'},{t:'JWN',n:'Nordstrom Inc.'},
+  {t:'M',n:'Macy\'s Inc.'},{t:'AMZN',n:'Amazon.com Inc.'},
+  // Consumer Staples
+  {t:'PG',n:'Procter & Gamble Co.'},{t:'KO',n:'The Coca-Cola Company'},
+  {t:'PEP',n:'PepsiCo Inc.'},{t:'PM',n:'Philip Morris International'},
+  {t:'MO',n:'Altria Group Inc.'},{t:'BTI',n:'British American Tobacco plc'},
+  {t:'CL',n:'Colgate-Palmolive Company'},{t:'KMB',n:'Kimberly-Clark Corporation'},
+  {t:'CHD',n:'Church & Dwight Co. Inc.'},{t:'ENR',n:'Energizer Holdings Inc.'},
+  {t:'EL',n:'Estée Lauder Companies Inc.'},{t:'COTY',n:'Coty Inc.'},
+  {t:'UN',n:'Unilever plc'},{t:'NSRGY',n:'Nestlé SA'},
+  {t:'GIS',n:'General Mills Inc.'},{t:'K',n:'Kellanova'},
+  {t:'CPB',n:'Campbell Soup Company'},{t:'HRL',n:'Hormel Foods Corporation'},
+  {t:'SJM',n:'J.M. Smucker Company'},{t:'MKC',n:'McCormick & Company'},
+  {t:'HSY',n:'The Hershey Company'},{t:'MDLZ',n:'Mondelez International'},
+  {t:'CAG',n:'Conagra Brands Inc.'},{t:'FRPT',n:'Freshpet Inc.'},
+  {t:'BYND',n:'Beyond Meat Inc.'},{t:'KR',n:'The Kroger Co.'},
+  {t:'SFM',n:'Sprouts Farmers Market Inc.'},{t:'GO',n:'Grocery Outlet Holding Corp.'},
+  {t:'USFD',n:'US Foods Holding Corp.'},{t:'SYY',n:'Sysco Corporation'},
+  // Energy
+  {t:'XOM',n:'Exxon Mobil Corporation'},{t:'CVX',n:'Chevron Corporation'},
+  {t:'COP',n:'ConocoPhillips'},{t:'EOG',n:'EOG Resources Inc.'},
+  {t:'PXD',n:'Pioneer Natural Resources'},{t:'DVN',n:'Devon Energy Corporation'},
+  {t:'FANG',n:'Diamondback Energy Inc.'},{t:'MPC',n:'Marathon Petroleum Corporation'},
+  {t:'VLO',n:'Valero Energy Corporation'},{t:'PSX',n:'Phillips 66'},
+  {t:'HES',n:'Hess Corporation'},{t:'APA',n:'APA Corporation'},
+  {t:'HAL',n:'Halliburton Company'},{t:'SLB',n:'SLB (Schlumberger)'},
+  {t:'BKR',n:'Baker Hughes Company'},{t:'NOV',n:'NOV Inc.'},
+  {t:'OXY',n:'Occidental Petroleum Corporation'},{t:'OKE',n:'ONEOK Inc.'},
+  {t:'WMB',n:'Williams Companies Inc.'},{t:'ET',n:'Energy Transfer LP'},
+  {t:'KMI',n:'Kinder Morgan Inc.'},{t:'EPD',n:'Enterprise Products Partners'},
+  {t:'MPLX',n:'MPLX LP'},{t:'LNG',n:'Cheniere Energy Inc.'},
+  {t:'AR',n:'Antero Resources Corporation'},{t:'EQT',n:'EQT Corporation'},
+  {t:'RRC',n:'Range Resources Corporation'},{t:'CNX',n:'CNX Resources Corporation'},
+  // Industrials
+  {t:'CAT',n:'Caterpillar Inc.'},{t:'DE',n:'Deere & Company'},
+  {t:'BA',n:'Boeing Company'},{t:'RTX',n:'RTX Corporation'},
+  {t:'LMT',n:'Lockheed Martin Corporation'},{t:'NOC',n:'Northrop Grumman Corporation'},
+  {t:'GD',n:'General Dynamics Corporation'},{t:'L3H',n:'L3Harris Technologies'},
+  {t:'GE',n:'GE Aerospace'},{t:'HON',n:'Honeywell International Inc.'},
+  {t:'MMM',n:'3M Company'},{t:'EMR',n:'Emerson Electric Co.'},
+  {t:'ETN',n:'Eaton Corporation plc'},{t:'ROK',n:'Rockwell Automation Inc.'},
+  {t:'PH',n:'Parker-Hannifin Corporation'},{t:'DOV',n:'Dover Corporation'},
+  {t:'ITW',n:'Illinois Tool Works Inc.'},{t:'XYL',n:'Xylem Inc.'},
+  {t:'GNRC',n:'Generac Holdings Inc.'},{t:'AIXI',n:'Xiao-I Corporation'},
+  {t:'UPS',n:'United Parcel Service Inc.'},{t:'FDX',n:'FedEx Corporation'},
+  {t:'CHRW',n:'C.H. Robinson Worldwide Inc.'},{t:'EXPD',n:'Expeditors International'},
+  {t:'JBHT',n:'J.B. Hunt Transport Services'},{t:'ODFL',n:'Old Dominion Freight Line'},
+  {t:'XPO',n:'XPO Inc.'},{t:'SAIA',n:'Saia Inc.'},
+  {t:'CSX',n:'CSX Corporation'},{t:'NSC',n:'Norfolk Southern Corporation'},
+  {t:'UNP',n:'Union Pacific Corporation'},{t:'BNSF',n:'Burlington Northern Santa Fe'},
+  {t:'DAL',n:'Delta Air Lines Inc.'},{t:'UAL',n:'United Airlines Holdings'},
+  {t:'AAL',n:'American Airlines Group Inc.'},{t:'LUV',n:'Southwest Airlines Co.'},
+  {t:'ALK',n:'Alaska Air Group Inc.'},{t:'SAVE',n:'Spirit Airlines Inc.'},
+  {t:'R',n:'Ryder System Inc.'},{t:'ALLE',n:'Allegion plc'},
+  {t:'IR',n:'Ingersoll Rand Inc.'},{t:'TT',n:'Trane Technologies plc'},
+  {t:'CARR',n:'Carrier Global Corporation'},{t:'OTIS',n:'Otis Worldwide Corporation'},
+  {t:'AME',n:'AMETEK Inc.'},{t:'ROP',n:'Roper Technologies Inc.'},
+  {t:'FTV',n:'Fortive Corporation'},{t:'DHI',n:'D.R. Horton Inc.'},
+  {t:'LEN',n:'Lennar Corporation'},{t:'NVR',n:'NVR Inc.'},
+  {t:'TOL',n:'Toll Brothers Inc.'},{t:'MDC',n:'MDC Holdings Inc.'},
+  // Materials
+  {t:'LIN',n:'Linde plc'},{t:'APD',n:'Air Products and Chemicals Inc.'},
+  {t:'FCX',n:'Freeport-McMoRan Inc.'},{t:'NEM',n:'Newmont Corporation'},
+  {t:'NUE',n:'Nucor Corporation'},{t:'STLD',n:'Steel Dynamics Inc.'},
+  {t:'RS',n:'Reliance Steel & Aluminum'},{t:'CLF',n:'Cleveland-Cliffs Inc.'},
+  {t:'CF',n:'CF Industries Holdings Inc.'},{t:'MOS',n:'The Mosaic Company'},
+  {t:'FMC',n:'FMC Corporation'},{t:'ECL',n:'Ecolab Inc.'},
+  {t:'PPG',n:'PPG Industries Inc.'},{t:'SHW',n:'Sherwin-Williams Company'},
+  {t:'RPM',n:'RPM International Inc.'},{t:'IFF',n:'International Flavors & Fragrances'},
+  {t:'ALB',n:'Albemarle Corporation'},{t:'LTHM',n:'Livent Corporation'},
+  {t:'LAC',n:'Lithium Americas Corp.'},{t:'PLL',n:'Piedmont Lithium Inc.'},
+  // Real Estate / REITs
+  {t:'AMT',n:'American Tower Corporation'},{t:'PLD',n:'Prologis Inc.'},
+  {t:'CCI',n:'Crown Castle Inc.'},{t:'EQIX',n:'Equinix Inc.'},
+  {t:'PSA',n:'Public Storage'},{t:'EXR',n:'Extra Space Storage Inc.'},
+  {t:'AVB',n:'AvalonBay Communities Inc.'},{t:'EQR',n:'Equity Residential'},
+  {t:'MAA',n:'Mid-America Apartment Communities'},{t:'UDR',n:'UDR Inc.'},
+  {t:'SPG',n:'Simon Property Group Inc.'},{t:'O',n:'Realty Income Corporation'},
+  {t:'WPC',n:'W. P. Carey Inc.'},{t:'NNN',n:'NNN REIT Inc.'},
+  {t:'STOR',n:'STORE Capital Corporation'},{t:'VICI',n:'VICI Properties Inc.'},
+  {t:'GLPI',n:'Gaming and Leisure Properties'},{t:'LADR',n:'Ladder Capital Corp.'},
+  {t:'WELL',n:'Welltower Inc.'},{t:'VTR',n:'Ventas Inc.'},
+  {t:'HR',n:'Healthcare Realty Trust'},{t:'MPW',n:'Medical Properties Trust'},
+  {t:'ARE',n:'Alexandria Real Estate Equities'},{t:'BXP',n:'BXP Inc.'},
+  {t:'VNO',n:'Vornado Realty Trust'},{t:'KIM',n:'Kimco Realty Corporation'},
+  {t:'REG',n:'Regency Centers Corporation'},{t:'FRT',n:'Federal Realty Investment Trust'},
+  {t:'DLR',n:'Digital Realty Trust Inc.'},{t:'SBAC',n:'SBA Communications Corporation'},
+  // Utilities
+  {t:'NEE',n:'NextEra Energy Inc.'},{t:'DUK',n:'Duke Energy Corporation'},
+  {t:'SO',n:'Southern Company'},{t:'D',n:'Dominion Energy Inc.'},
+  {t:'AEP',n:'American Electric Power'},{t:'EXC',n:'Exelon Corporation'},
+  {t:'PCG',n:'PG&E Corporation'},{t:'ED',n:'Consolidated Edison Inc.'},
+  {t:'ES',n:'Eversource Energy'},{t:'XEL',n:'Xcel Energy Inc.'},
+  {t:'WEC',n:'WEC Energy Group Inc.'},{t:'DTE',n:'DTE Energy Company'},
+  {t:'CMS',n:'CMS Energy Corporation'},{t:'AES',n:'AES Corporation'},
+  {t:'AWK',n:'American Water Works Company'},{t:'WTR',n:'Artesian Resources Corporation'},
+  // Popular ETFs
+  {t:'SPY',n:'SPDR S&P 500 ETF Trust'},{t:'IVV',n:'iShares Core S&P 500 ETF'},
+  {t:'VOO',n:'Vanguard S&P 500 ETF'},{t:'VTI',n:'Vanguard Total Stock Market ETF'},
+  {t:'QQQ',n:'Invesco QQQ Trust (Nasdaq-100)'},{t:'QQQM',n:'Invesco Nasdaq-100 ETF'},
+  {t:'IWM',n:'iShares Russell 2000 ETF'},{t:'IWF',n:'iShares Russell 1000 Growth ETF'},
+  {t:'VGT',n:'Vanguard Information Technology ETF'},{t:'XLK',n:'Technology Select Sector SPDR'},
+  {t:'XLF',n:'Financial Select Sector SPDR'},{t:'XLE',n:'Energy Select Sector SPDR'},
+  {t:'XLV',n:'Health Care Select Sector SPDR'},{t:'XLI',n:'Industrial Select Sector SPDR'},
+  {t:'XLC',n:'Communication Services Select Sector SPDR'},{t:'XLY',n:'Consumer Discretionary Select Sector SPDR'},
+  {t:'XLP',n:'Consumer Staples Select Sector SPDR'},{t:'XLU',n:'Utilities Select Sector SPDR'},
+  {t:'XLB',n:'Materials Select Sector SPDR'},{t:'XLRE',n:'Real Estate Select Sector SPDR'},
+  {t:'ARKK',n:'ARK Innovation ETF'},{t:'ARKQ',n:'ARK Autonomous Tech & Robotics ETF'},
+  {t:'ARKW',n:'ARK Next Generation Internet ETF'},{t:'ARKG',n:'ARK Genomic Revolution ETF'},
+  {t:'ARKF',n:'ARK Fintech Innovation ETF'},{t:'ARKX',n:'ARK Space Exploration ETF'},
+  {t:'GLD',n:'SPDR Gold Shares'},{t:'IAU',n:'iShares Gold Trust'},
+  {t:'SLV',n:'iShares Silver Trust'},{t:'GDX',n:'VanEck Gold Miners ETF'},
+  {t:'GDXJ',n:'VanEck Junior Gold Miners ETF'},{t:'USO',n:'United States Oil Fund'},
+  {t:'DBO',n:'Invesco DB Oil Fund'},{t:'TLT',n:'iShares 20+ Year Treasury Bond ETF'},
+  {t:'IEF',n:'iShares 7-10 Year Treasury Bond ETF'},{t:'HYG',n:'iShares iBoxx High Yield Corporate Bond ETF'},
+  {t:'LQD',n:'iShares iBoxx Investment Grade Corporate Bond ETF'},{t:'AGG',n:'iShares Core U.S. Aggregate Bond ETF'},
+  {t:'BND',n:'Vanguard Total Bond Market ETF'},{t:'BITO',n:'ProShares Bitcoin Strategy ETF'},
+  {t:'IBIT',n:'iShares Bitcoin Trust ETF'},{t:'FBTC',n:'Fidelity Wise Origin Bitcoin Fund'},
+  {t:'GBTC',n:'Grayscale Bitcoin Trust'},{t:'ETHE',n:'Grayscale Ethereum Trust'},
+  {t:'MSOS',n:'AdvisorShares Pure US Cannabis ETF'},{t:'MJ',n:'ETFMG Alternative Harvest ETF'},
+  {t:'BOTZ',n:'Global X Robotics & Artificial Intelligence ETF'},{t:'ROBO',n:'ROBO Global Robotics and Automation ETF'},
+  {t:'SOXX',n:'iShares Semiconductor ETF'},{t:'SMH',n:'VanEck Semiconductor ETF'},
+  {t:'FINX',n:'Global X FinTech ETF'},{t:'CIBR',n:'First Trust NASDAQ Cybersecurity ETF'},
+  {t:'HACK',n:'ETFMG Prime Cyber Security ETF'},{t:'SKYY',n:'First Trust Cloud Computing ETF'},
+  {t:'WCLD',n:'WisdomTree Cloud Computing Fund'},{t:'CLOU',n:'Global X Cloud Computing ETF'},
+  {t:'SOXS',n:'Direxion Daily Semiconductor Bear 3X Shares'},{t:'SOXL',n:'Direxion Daily Semiconductor Bull 3X Shares'},
+  {t:'TQQQ',n:'ProShares UltraPro QQQ'},{t:'SQQQ',n:'ProShares UltraPro Short QQQ'},
+  {t:'UPRO',n:'ProShares UltraPro S&P 500'},{t:'SPXS',n:'Direxion Daily S&P 500 Bear 3X'},
+  {t:'SPXU',n:'ProShares UltraPro Short S&P 500'},{t:'UVXY',n:'ProShares Ultra VIX Short-Term Futures ETF'},
+  {t:'VXX',n:'iPath Series B S&P 500 VIX Short-Term Futures ETN'},
+  {t:'VIXY',n:'ProShares VIX Short-Term Futures ETF'},{t:'RSP',n:'Invesco S&P 500 Equal Weight ETF'},
+  {t:'VEA',n:'Vanguard FTSE Developed Markets ETF'},{t:'VWO',n:'Vanguard FTSE Emerging Markets ETF'},
+  {t:'EEM',n:'iShares MSCI Emerging Markets ETF'},{t:'EFA',n:'iShares MSCI EAFE ETF'},
+  {t:'FXI',n:'iShares China Large-Cap ETF'},{t:'KWEB',n:'KraneShares CSI China Internet ETF'},
+  {t:'EWZ',n:'iShares MSCI Brazil ETF'},{t:'EWJ',n:'iShares MSCI Japan ETF'},
+  // Popular individual stocks continued
+  {t:'COIN',n:'Coinbase Global Inc.'},{t:'HOOD',n:'Robinhood Markets Inc.'},
+  {t:'MSTR',n:'MicroStrategy Incorporated'},{t:'MARA',n:'MARA Holdings Inc.'},
+  {t:'RIOT',n:'Riot Platforms Inc.'},{t:'CLSK',n:'CleanSpark Inc.'},
+  {t:'HUT',n:'Hut 8 Corp.'},{t:'BTBT',n:'Bit Digital Inc.'},
+  {t:'PLTR',n:'Palantir Technologies Inc.'},{t:'RBLX',n:'Roblox Corporation'},
+  {t:'RIVN',n:'Rivian Automotive Inc.'},{t:'LCID',n:'Lucid Group Inc.'},
+  {t:'NIO',n:'NIO Inc.'},{t:'LI',n:'Li Auto Inc.'},
+  {t:'XPEV',n:'XPeng Inc.'},{t:'F',n:'Ford Motor Company'},
+  {t:'GM',n:'General Motors Company'},{t:'STLA',n:'Stellantis N.V.'},
+  {t:'TM',n:'Toyota Motor Corporation'},{t:'HMC',n:'Honda Motor Co. Ltd.'},
+  {t:'RACE',n:'Ferrari N.V.'},{t:'BMWYY',n:'BMW AG'},
+  {t:'VWAGY',n:'Volkswagen AG'},{t:'MBGYY',n:'Mercedes-Benz Group AG'},
+  {t:'RKT',n:'Rocket Companies Inc.'},{t:'OPEN',n:'Opendoor Technologies Inc.'},
+  {t:'COMP',n:'Compass Inc.'},{t:'Z',n:'Zillow Group Inc. (Class C)'},
+  {t:'RDFN',n:'Redfin Corporation'},{t:'HOUS',n:'Anywhere Real Estate Inc.'},
+  {t:'SPCE',n:'Virgin Galactic Holdings'},{t:'RDW',n:'Redwire Corporation'},
+  {t:'RKLB',n:'Rocket Lab USA Inc.'},{t:'ASTS',n:'AST SpaceMobile Inc.'},
+  {t:'LUNR',n:'Intuitive Machines Inc.'},{t:'MNTS',n:'Momentus Inc.'},
+  {t:'JOBY',n:'Joby Aviation Inc.'},{t:'ACHR',n:'Archer Aviation Inc.'},
+  {t:'LILM',n:'Lilium N.V.'},{t:'EVTOL',n:'Eve Holding Inc.'},
+  {t:'ENVX',n:'Enovix Corporation'},{t:'QS',n:'QuantumScape Corporation'},
+  {t:'STEM',n:'Stem Inc.'},{t:'FSLR',n:'First Solar Inc.'},
+  {t:'ENPH',n:'Enphase Energy Inc.'},{t:'SEDG',n:'SolarEdge Technologies Inc.'},
+  {t:'RUN',n:'Sunrun Inc.'},{t:'SPWR',n:'SunPower Corporation'},
+  {t:'BE',n:'Bloom Energy Corporation'},{t:'PLUG',n:'Plug Power Inc.'},
+  {t:'FCEL',n:'FuelCell Energy Inc.'},{t:'BLDP',n:'Ballard Power Systems'},
+  {t:'NOVA',n:'Sunnova Energy International'},{t:'ARRY',n:'Array Technologies Inc.'},
+  {t:'NEP',n:'NextEra Energy Partners LP'},{t:'BEP',n:'Brookfield Renewable Partners'},
+  {t:'AY',n:'Atlantica Sustainable Infrastructure'},{t:'CWEN',n:'Clearway Energy Inc.'},
+  {t:'ORA',n:'Ormat Technologies Inc.'},{t:'GPRE',n:'Green Plains Inc.'},
+  // More popular names
+  {t:'NKLA',n:'Nikola Corporation'},{t:'WKHS',n:'Workhorse Group Inc.'},
+  {t:'FSR',n:'Fisker Inc.'},{t:'GOEV',n:'Canoo Inc.'},
+  {t:'HYLN',n:'Hyliion Holdings Corp.'},{t:'REE',n:'REE Automotive Ltd.'},
+  {t:'SOLO',n:'Electrameccanica Vehicles Corp.'},{t:'AYRO',n:'AYRO Inc.'},
+  {t:'WBX',n:'Wallbox N.V.'},{t:'BLNK',n:'Blink Charging Co.'},
+  {t:'EVGO',n:'EVgo Inc.'},{t:'CHPT',n:'ChargePoint Holdings Inc.'},
+  {t:'VLTO',n:'Veralto Corporation'},{t:'GEHC',n:'GE HealthCare Technologies'},
+  {t:'KVUE',n:'Kenvue Inc.'},{t:'SOLV',n:'Solventum Corporation'},
+  {t:'GFS',n:'GlobalFoundries Inc.'},{t:'ARM',n:'Arm Holdings plc'},
+  {t:'BIRK',n:'Birkenstock Holding plc'},{t:'CART',n:'Instacart (Maplebear Inc.)'},
+  {t:'KVYO',n:'Klaviyo Inc.'},{t:'ONON',n:'On Holding AG'},
+  {t:'BIRK',n:'Birkenstock Holding plc'},{t:'CAVA',n:'CAVA Group Inc.'},
+  {t:'SHAK',n:'Shake Shack Inc.'},{t:'TXRH',n:'Texas Roadhouse Inc.'},
+  {t:'DINE',n:'Dine Brands Global Inc.'},{t:'EAT',n:'Brinker International Inc.'},
+  {t:'DRI',n:'Darden Restaurants Inc.'},{t:'RUTH',n:'Ruth\'s Hospitality Group'},
+  {t:'CAKE',n:'The Cheesecake Factory Incorporated'},{t:'BJRI',n:'BJ\'s Restaurants Inc.'},
+  {t:'WING',n:'Wingstop Inc.'},{t:'NATH',n:'Nathan\'s Famous Inc.'},
+  {t:'BROS',n:'Dutch Bros Inc.'},{t:'DNKN',n:'Dunkin\' Brands Group'},
+  {t:'WEN',n:'Wendy\'s Company'},{t:'JACK',n:'Jack in the Box Inc.'},
+  {t:'SONC',n:'Sonic Automotive Inc.'},{t:'AN',n:'AutoNation Inc.'},
+  {t:'KMX',n:'CarMax Inc.'},{t:'CVNA',n:'Carvana Co.'},
+  {t:'VRM',n:'Vroom Inc.'},{t:'ACMR',n:'ACM Research Inc.'},
+  {t:'SMAR',n:'Smartsheet Inc.'},{t:'FRSH',n:'Freshworks Inc.'},
+  {t:'ZI',n:'ZoomInfo Technologies Inc.'},{t:'BRZE',n:'Braze Inc.'},
+  {t:'TTD',n:'The Trade Desk Inc.'},{t:'MGNI',n:'Magnite Inc.'},
+  {t:'IAS',n:'Integral Ad Science Holding Corp.'},{t:'DV',n:'DoubleVerify Holdings Inc.'},
+  {t:'PUBM',n:'PubMatic Inc.'},{t:'APP',n:'Applovin Corporation'},
+  {t:'IRBT',n:'iRobot Corporation'},{t:'MTTR',n:'Matterport Inc.'},
+  {t:'OUST',n:'Ouster Inc.'},{t:'LIDR',n:'AEye Inc.'},
+  {t:'LAZR',n:'Luminar Technologies Inc.'},{t:'INVZ',n:'Innoviz Technologies Ltd.'},
 ];
+
+// De-duplicate the stock DB by ticker
+const _seenTickers = new Set();
+const STOCK_DB_DEDUP = STOCK_DB.filter(s => {
+  if (_seenTickers.has(s.t)) return false;
+  _seenTickers.add(s.t);
+  return true;
+});
 
 // ═══════════════════════════════════════════════════════════════
 // STATE
@@ -1500,7 +1767,7 @@ function getHoldings() {
 
     holdings.push({
       ticker,
-      name: priceData?.name || STOCK_DB.find(s=>s.t===ticker)?.n || ticker,
+      name: priceData?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ticker,
       shares: currentShares,
       avgCost,
       costBasis,
@@ -1577,7 +1844,7 @@ async function fetchPrice(ticker) {
       high: parseFloat(q['03. high']),
       low: parseFloat(q['04. low']),
       volume: parseInt(q['06. volume']),
-      name: STOCK_DB.find(s=>s.t===ticker)?.n || ticker
+      name: STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ticker
     };
   } catch(e) {
     return null;
@@ -1701,7 +1968,7 @@ function navigate(screen, ticker) {
     document.getElementById('tab-detail-label').textContent = ticker;
     document.getElementById('header-title').textContent = ticker;
     const p = state.prices[ticker];
-    document.getElementById('header-subtitle').textContent = p?.name || STOCK_DB.find(s=>s.t===ticker)?.n || '';
+    document.getElementById('header-subtitle').textContent = p?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || '';
     document.getElementById('header-subtitle').style.display = 'block';
     addBtn.style.display = 'none';
     renderDetail(ticker);
@@ -1768,6 +2035,24 @@ function renderHomeKPIs() {
   const rzEl = document.getElementById('kpi-realized');
   rzEl.textContent = fmt$(kpis.allRealized);
   rzEl.className = 'kpi-value ' + signClass(kpis.allRealized);
+
+  // Last refresh time on home screen
+  const refreshEl = document.getElementById('home-last-refresh');
+  if (refreshEl) {
+    if (state.settings.lastRefresh) {
+      const d = new Date(state.settings.lastRefresh);
+      const now = new Date();
+      const diffMin = Math.floor((now - d) / 60000);
+      let timeStr;
+      if (diffMin < 1) timeStr = 'just now';
+      else if (diffMin < 60) timeStr = `${diffMin}m ago`;
+      else if (diffMin < 1440) timeStr = `${Math.floor(diffMin/60)}h ${diffMin%60}m ago`;
+      else timeStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+      refreshEl.textContent = `Prices as of ${timeStr}`;
+    } else {
+      refreshEl.textContent = state.settings.apiKey ? 'Prices not yet refreshed' : 'Add API key in Settings to get live prices';
+    }
+  }
 }
 
 function renderHoldingsTable() {
@@ -1882,7 +2167,7 @@ async function renderDetail(ticker) {
     <button class="back-btn" onclick="navigate('home')">←</button>
     <div class="stock-detail-info">
       <div class="stock-detail-ticker">${ticker}</div>
-      <div class="stock-detail-company">${p?.name || STOCK_DB.find(s=>s.t===ticker)?.n || ''}</div>
+      <div class="stock-detail-company">${p?.name || STOCK_DB_DEDUP.find(s=>s.t===ticker)?.n || ''}</div>
     </div>
     <div class="stock-detail-price">
       <div class="stock-detail-price-val">${price ? fmt$(price) : '—'}</div>
@@ -2269,16 +2554,23 @@ function onTickerInput(val) {
   const q = val.trim().toUpperCase();
   if (!q) { list.classList.remove('show'); return; }
 
-  const matches = STOCK_DB.filter(s =>
-    s.t.startsWith(q) || s.n.toUpperCase().includes(q)
-  ).slice(0, 8);
+  const matches = STOCK_DB_DEDUP.filter(s =>
+    s.t.startsWith(q) || s.t.includes(q) || s.n.toUpperCase().includes(q)
+  ).slice(0, 10);
 
-  if (!matches.length) { list.classList.remove('show'); return; }
+  // Always show a "Use [TICKER] anyway" option if not an exact match
+  const exactMatch = STOCK_DB_DEDUP.find(s => s.t === q);
+  const items = [...matches];
+  if (!exactMatch && q.length >= 1) {
+    items.push({ t: q, n: 'Enter manually (not in database)', _manual: true });
+  }
 
-  list.innerHTML = matches.map(s => `
+  if (!items.length) { list.classList.remove('show'); return; }
+
+  list.innerHTML = items.map(s => `
     <div class="autocomplete-item" onclick="selectTicker('${s.t}')">
       <div class="autocomplete-ticker">${s.t}</div>
-      <div class="autocomplete-name">${s.n}</div>
+      <div class="autocomplete-name" style="${s._manual ? 'color:var(--blue);font-style:italic' : ''}">${s.n}</div>
     </div>
   `).join('');
   list.classList.add('show');
@@ -2514,14 +2806,9 @@ function init() {
     }
   });
 
-  // Auto-refresh prices if API key exists and it's been a while
+  // Auto-refresh prices every time the app opens (if API key set and have holdings)
   if (state.settings.apiKey && state.transactions.length) {
-    const last = state.settings.lastRefresh ? new Date(state.settings.lastRefresh) : null;
-    const now = new Date();
-    const hoursSince = last ? (now - last) / 3600000 : Infinity;
-    if (hoursSince > 4) {
-      setTimeout(() => refreshAllPrices(), 1500);
-    }
+    setTimeout(() => refreshAllPrices(), 800);
   }
 }
 
