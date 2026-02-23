@@ -1004,6 +1004,15 @@
           </div>
         </div>
 
+        <!-- Rate Limit Banner — shown only when AV rate limit was hit today -->
+        <div id="rate-limit-banner" style="display:none;align-items:center;gap:10px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:var(--radius);padding:11px 14px;margin-bottom:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:#dc2626">API rate limit reached today</div>
+            <div style="font-size:11px;color:#ef4444;margin-top:1px">Showing last saved prices. <span id="rate-limit-reset">Resets at midnight UTC</span>.</div>
+          </div>
+        </div>
+
         <!-- Last Refreshed Card -->
         <div id="last-refresh-bar" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)">
           <div>
@@ -2023,19 +2032,20 @@ function getPortfolioKPIs() {
 // Since we can't reliably CORS-proxy Yahoo, we use Alpha Vantage + demo fallback
 
 // ── API quota tracker ──
-// Counts requests used today, resets at midnight. Stored in localStorage.
+// Counts requests used today, resets at midnight UTC. Stored in localStorage.
 function getQuotaToday() {
   try {
     const raw = localStorage.getItem('st_quota');
-    if (!raw) return { date: '', used: 0 };
+    if (!raw) return { date: '', used: 0, rateLimitHit: false };
     return JSON.parse(raw);
-  } catch(e) { return { date: '', used: 0 }; }
+  } catch(e) { return { date: '', used: 0, rateLimitHit: false }; }
 }
 function recordApiCall(count = 1) {
   const today = new Date().toISOString().split('T')[0];
   const q = getQuotaToday();
   const used = (q.date === today ? q.used : 0) + count;
-  localStorage.setItem('st_quota', JSON.stringify({ date: today, used }));
+  const rateLimitHit = q.date === today ? (q.rateLimitHit || false) : false;
+  localStorage.setItem('st_quota', JSON.stringify({ date: today, used, rateLimitHit }));
   return used;
 }
 function getRemainingQuota() {
@@ -2043,6 +2053,31 @@ function getRemainingQuota() {
   const q = getQuotaToday();
   const used = q.date === today ? q.used : 0;
   return Math.max(0, 25 - used);
+}
+function setRateLimitHit() {
+  const today = new Date().toISOString().split('T')[0];
+  const q = getQuotaToday();
+  const used = q.date === today ? q.used : 0;
+  localStorage.setItem('st_quota', JSON.stringify({ date: today, used: 25, rateLimitHit: true }));
+}
+function wasRateLimitedToday() {
+  const today = new Date().toISOString().split('T')[0];
+  const q = getQuotaToday();
+  return q.date === today && q.rateLimitHit === true;
+}
+// Returns minutes until midnight UTC (when quota resets)
+function minutesUntilQuotaReset() {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setUTCHours(24, 0, 0, 0);
+  return Math.ceil((midnight - now) / 60000);
+}
+function formatResetTime() {
+  const mins = minutesUntilQuotaReset();
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 // Parse a single quote object from AV response into our price shape
@@ -2073,6 +2108,12 @@ async function fetchPrice(ticker) {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${key}`;
     const r = await fetch(url);
     const data = await r.json();
+    if (data['Information']?.includes('rate limit') || data['Note']?.includes('call frequency')) {
+      setRateLimitHit();
+      renderRefreshBar();
+      showToast('API rate limit reached — try again tomorrow', 'error');
+      return null;
+    }
     const result = parseQuote(data['Global Quote'], ticker);
     if (result) recordApiCall(1);
     return result;
@@ -2081,30 +2122,45 @@ async function fetchPrice(ticker) {
   }
 }
 
-// Batch fetch — up to 100 tickers in ONE request (saves 99 requests vs looping)
-// Fetch all tickers in parallel using GLOBAL_QUOTE (reliable free-tier endpoint).
-// Fires all requests simultaneously so 10 stocks takes the same time as 1.
+// Fetch all tickers in parallel using GLOBAL_QUOTE.
+// Detects the Alpha Vantage rate-limit response and records it.
 async function fetchPricesBatch(tickers) {
   const key = state.settings.apiKey;
   if (!key || !tickers.length) return {};
 
   const results = {};
-  // Fire all requests at once
+  let rateLimitDetected = false;
+
   const fetches = tickers.map(ticker => {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${key}`;
     return fetch(url)
       .then(r => r.json())
       .then(data => {
+        // Alpha Vantage returns an "Information" key when rate-limited
+        if (data['Information'] && data['Information'].includes('rate limit')) {
+          rateLimitDetected = true;
+          return; // don't record as a successful fetch
+        }
+        // Also catches "Note" key for per-minute limits
+        if (data['Note'] && data['Note'].includes('call frequency')) {
+          rateLimitDetected = true;
+          return;
+        }
         const q = data['Global Quote'];
         const parsed = parseQuote(q, ticker);
         if (parsed) results[ticker] = parsed;
       })
-      .catch(() => {}); // silently skip failed individual tickers
+      .catch(() => {});
   });
 
   await Promise.allSettled(fetches);
-  // Record actual number of successful calls made
-  recordApiCall(tickers.length);
+
+  if (rateLimitDetected) {
+    setRateLimitHit(); // pin quota to 0 and flag as rate-limited today
+  } else {
+    recordApiCall(tickers.length);
+  }
+
   return results;
 }
 
@@ -2205,7 +2261,13 @@ async function refreshAllPrices() {
 
   renderRefreshBar();
   const left = getRemainingQuota();
-  showToast(`Updated ${updated}/${tickers.length} prices · ${left} calls left today`, 'success');
+  if (wasRateLimitedToday()) {
+    showToast(`API rate limit reached — showing last saved prices. Resets in ${formatResetTime()}.`, 'error');
+  } else if (updated === 0) {
+    showToast('No prices updated — check your API key', 'error');
+  } else {
+    showToast(`Updated ${updated}/${tickers.length} prices · ${left} calls left today`, 'success');
+  }
 }
 
 // Change % by period
@@ -2341,32 +2403,49 @@ function renderHomeKPIs() {
 }
 
 function renderRefreshBar() {
-  const refreshEl = document.getElementById('home-last-refresh');
-  const quotaEl   = document.getElementById('home-quota-label');
-  const btn       = document.getElementById('refresh-btn');
+  const refreshEl  = document.getElementById('home-last-refresh');
+  const quotaEl    = document.getElementById('home-quota-label');
+  const btn        = document.getElementById('refresh-btn');
+  const rateBanner = document.getElementById('rate-limit-banner');
   if (!refreshEl) return;
 
-  const quotaLeft = getRemainingQuota();
-  const quotaUsed = 25 - quotaLeft;
+  const quotaLeft      = getRemainingQuota();
+  const rateLimited    = wasRateLimitedToday();
+  const resetIn        = formatResetTime();
+  const outOfQuota     = quotaLeft < 1 || rateLimited;
 
-  // Quota line — color-coded by how many are left
+  // ── Rate-limit banner ──
+  if (rateBanner) {
+    if (rateLimited) {
+      rateBanner.style.display = 'flex';
+      document.getElementById('rate-limit-reset').textContent = `Resets in ${resetIn}`;
+    } else {
+      rateBanner.style.display = 'none';
+    }
+  }
+
+  // ── Quota label — color-coded ──
   if (quotaEl) {
-    let quotaColor = 'var(--text3)';
-    if (quotaLeft <= 5)  quotaColor = 'var(--red)';
-    else if (quotaLeft <= 10) quotaColor = '#d97706'; // amber
-    quotaEl.style.color = quotaColor;
-    quotaEl.textContent = `${quotaLeft} of 25 API calls remaining today`;
+    if (rateLimited) {
+      quotaEl.style.color = 'var(--red)';
+      quotaEl.textContent = `Rate limit hit today · resets in ${resetIn} (midnight UTC)`;
+    } else {
+      let quotaColor = 'var(--text3)';
+      if (quotaLeft <= 5)       quotaColor = 'var(--red)';
+      else if (quotaLeft <= 10) quotaColor = '#d97706';
+      quotaEl.style.color = quotaColor;
+      quotaEl.textContent = `${quotaLeft} of 25 API calls remaining today`;
+    }
   }
 
-  // Disable button if out of quota
+  // ── Disable refresh button when out of quota ──
   if (btn) {
-    const outOfQuota = quotaLeft < 1;
-    btn.disabled = outOfQuota;
-    btn.style.opacity = outOfQuota ? '0.4' : '1';
-    btn.style.cursor  = outOfQuota ? 'not-allowed' : 'pointer';
+    btn.disabled       = outOfQuota;
+    btn.style.opacity  = outOfQuota ? '0.4' : '1';
+    btn.style.cursor   = outOfQuota ? 'not-allowed' : 'pointer';
   }
 
-  // Last refresh timestamp
+  // ── Last refresh timestamp ──
   if (!state.settings.lastRefresh) {
     refreshEl.textContent = state.settings.apiKey
       ? 'Tap Refresh to load live prices'
@@ -2378,8 +2457,8 @@ function renderRefreshBar() {
   const now = new Date();
   const diffMin = Math.floor((now - d) / 60000);
   let timeStr;
-  if (diffMin < 1)        timeStr = 'just now';
-  else if (diffMin < 60)  timeStr = `${diffMin} minute${diffMin===1?'':'s'} ago`;
+  if (diffMin < 1)         timeStr = 'just now';
+  else if (diffMin < 60)   timeStr = `${diffMin} minute${diffMin===1?'':'s'} ago`;
   else if (diffMin < 1440) {
     const h = Math.floor(diffMin / 60);
     const m = diffMin % 60;
@@ -3521,10 +3600,9 @@ function init() {
     }
   });
 
-  // Tick the "X minutes ago" label every minute so it stays accurate
+  // Tick every minute: updates "X minutes ago" label and rate-limit reset countdown
   setInterval(() => {
-    const refreshEl = document.getElementById('home-last-refresh');
-    if (refreshEl) renderRefreshBar();
+    if (document.getElementById('home-last-refresh')) renderRefreshBar();
   }, 60000);
 }
 
