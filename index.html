@@ -2342,25 +2342,28 @@ async function fetchPeriodChange(ticker, period) {
   const key = state.settings.apiKey;
   const p = state.prices[ticker];
   if (!key || !p || period === '1d') return;
-  // Already have it
+  // Already have it cached
   if (p.periodSnaps && p.periodSnaps[period]) return;
 
   const now = Math.floor(Date.now() / 1000);
-  const offsets = { '1w': 7, '1m': 30, '1y': 365 };
-  const days = offsets[period] || 7;
+  // Go back slightly further than needed so we always get at least one candle
+  const offsets = { '1w': 9, '1m': 35, '1y': 370 };
+  const days = offsets[period] || 9;
   const from = now - days * 86400;
 
   try {
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from}&to=${now}&token=${key}`;
     const r = await fetch(url);
     const data = await r.json();
-    if (data.s !== 'ok' || !data.o || !data.o.length) return;
-    // Use the open of the first candle in the period as baseline
-    const openPrice = data.o[0];
+    if (data.s !== 'ok' || !data.c || !data.c.length) return;
+    // Use the close of the FIRST candle in the range as the "price N days ago"
+    // This is more accurate than using open price
+    const basePrice = data.c[0];
+    if (!basePrice || basePrice === 0) return;
     if (!state.prices[ticker].periodSnaps) state.prices[ticker].periodSnaps = {};
-    state.prices[ticker].periodSnaps[period] = openPrice;
+    state.prices[ticker].periodSnaps[period] = basePrice;
     save();
-  } catch(e) {}
+  } catch(e) { console.error('fetchPeriodChange error:', ticker, period, e); }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2445,12 +2448,28 @@ function setChangePeriod(p, btn) {
   changePeriod = p;
   document.querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Fetch period open prices for all holdings if needed
-  if (p !== '1d') {
+
+  if (p === '1d') {
+    // 1d data is always available — render immediately
+    renderHoldingsTable();
+  } else {
+    // Check which tickers still need period data fetched
     const tickers = [...new Set(state.transactions.map(t => t.ticker))];
-    Promise.all(tickers.map(t => fetchPeriodChange(t, p))).then(() => renderHoldingsTable());
+    const needsFetch = tickers.filter(t => {
+      const pr = state.prices[t];
+      return pr && !(pr.periodSnaps && pr.periodSnaps[p]);
+    });
+
+    if (needsFetch.length === 0) {
+      // All data already cached — render immediately
+      renderHoldingsTable();
+    } else {
+      // Render now (will show — for missing ones), then re-render when fetches done
+      renderHoldingsTable();
+      Promise.all(needsFetch.map(t => fetchPeriodChange(t, p)))
+        .then(() => renderHoldingsTable());
+    }
   }
-  renderHoldingsTable();
 }
 
 function renderHome() {
