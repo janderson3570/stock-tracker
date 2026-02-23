@@ -42,35 +42,27 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   
-  html {
-    height: 100%;
-    overscroll-behavior: none;
-  }
-
-  body {
-    height: 100%;
-    width: 100%;
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
     background: var(--bg);
     font-family: var(--font);
     color: var(--text);
-    overflow: hidden;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
-    touch-action: pan-x pan-y;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
   }
 
   #app {
+    /* Pin the whole app shell to the screen using fixed positioning.
+       This is the most reliable layout for iOS PWA / standalone mode.
+       We explicitly set all four edges so nothing can push the tab bar up. */
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     flex-direction: column;
-    /* dvh = dynamic viewport height: correctly excludes iOS home indicator */
-    height: 100dvh;
-    /* Fallback for older iOS that doesn't support dvh */
-    height: -webkit-fill-available;
-    width: 100%;
+    /* Push content below the notch / Dynamic Island */
     padding-top: env(safe-area-inset-top, 0px);
-    overflow: hidden;
   }
 
   /* ── HEADER ── */
@@ -139,8 +131,10 @@
     display: flex;
     align-items: flex-start;
     padding-top: 10px;
-    /* Pad out the iOS home indicator area so tabs don't sit on top of it */
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+    /* safe-area-inset-bottom handles the iPhone home indicator.
+       The fixed #app already ends at the physical bottom edge,
+       so this padding just keeps tab labels from being obscured. */
+    padding-bottom: env(safe-area-inset-bottom, 12px);
     z-index: 10;
   }
   .tab-btn {
@@ -148,13 +142,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     background: none;
     border: none;
     cursor: pointer;
     padding: 0;
     transition: opacity 0.15s;
-    min-height: 44px;
   }
   .tab-btn:active { opacity: 0.6; }
   .tab-icon {
@@ -170,8 +163,8 @@
     transition: color 0.15s;
   }
   .tab-btn.active .tab-label { color: var(--text); }
-  .tab-btn.active .tab-icon svg { fill: var(--text); }
-  .tab-btn .tab-icon svg { fill: var(--text3); transition: fill 0.15s; }
+  .tab-btn.active .tab-icon svg { stroke: var(--text); }
+  .tab-btn .tab-icon svg { stroke: var(--text3); transition: stroke 0.15s; }
 
   /* ── SCROLL CONTENT ── */
   .page-content {
@@ -264,11 +257,14 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
     margin-bottom: 16px;
   }
   .stocks-table {
     width: 100%;
+    min-width: 520px; /* forces horizontal scroll on narrow screens */
     border-collapse: collapse;
     font-size: 13px;
   }
@@ -1034,6 +1030,17 @@
 
     <!-- DETAIL SCREEN -->
     <div class="screen" id="screen-detail">
+      <!-- Stock selector dropdown row -->
+      <div style="padding:12px 16px 0;display:flex;align-items:center;gap:10px">
+        <div style="position:relative;flex:1">
+          <select id="stock-select" onchange="navigate('detail', this.value)"
+            style="width:100%;padding:9px 32px 9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                   font-size:15px;font-weight:600;font-family:var(--font);color:var(--text);background:var(--surface);
+                   -webkit-appearance:none;appearance:none;outline:none;cursor:pointer">
+          </select>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:12px">▼</span>
+        </div>
+      </div>
       <div class="stock-detail-header" id="detail-header"></div>
       <div class="kpi-grid" style="padding:0 16px;margin-bottom:16px" id="detail-kpis"></div>
       <div class="chart-wrap" id="detail-chart-wrap">
@@ -1195,23 +1202,34 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-home" onclick="navigate('home')">
       <div class="tab-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12L12 4l9 8"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/>
+        </svg>
       </div>
       <div class="tab-label">Portfolio</div>
     </button>
-    <button class="tab-btn" id="tab-detail" onclick="navigate('detail')" style="display:none">
-      <div class="tab-icon">📈</div>
+    <button class="tab-btn" id="tab-detail" onclick="navigate('detail')">
+      <div class="tab-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
       <div class="tab-label" id="tab-detail-label">Stock</div>
     </button>
     <button class="tab-btn" id="tab-history" onclick="navigate('history')">
       <div class="tab-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+        </svg>
       </div>
       <div class="tab-label">History</div>
     </button>
     <button class="tab-btn" id="tab-settings" onclick="navigate('settings')">
       <div class="tab-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
       </div>
       <div class="tab-label">Settings</div>
     </button>
@@ -1679,11 +1697,32 @@ async function loadLiveListing() {
   } catch(e) {}
 
   // Fetch fresh from Alpha Vantage listing status endpoint
+  // Must go through a CORS proxy — AV's LISTING_STATUS endpoint blocks direct browser requests
   const key = '7CEQOA1NBV1XNPB0';
+  const CORS_PROXIES = [
+    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://cors-anywhere.herokuapp.com/${u}`,
+  ];
   try {
-    const url = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${key}`;
-    const res = await fetch(url);
-    const text = await res.text();
+    const avUrl = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${key}`;
+    let text = null;
+
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const res = await fetch(proxy(avUrl), { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) continue;
+        const t = await res.text();
+        // Quick sanity check — real CSV starts with "symbol," header
+        if (t.trim().startsWith('symbol,') || t.includes('symbol,name,exchange')) {
+          text = t;
+          break;
+        }
+      } catch(e) {
+        continue; // try next proxy
+      }
+    }
+    if (!text) throw new Error('All proxies failed');
 
     // Parse CSV: symbol,name,exchange,assetType,ipoDate,delistingDate,status
     const lines = text.trim().split('\n');
@@ -2045,37 +2084,62 @@ function getPriceChange(ticker, period) {
 // ═══════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
+// Populate the stock-select dropdown with current holdings
+function populateStockSelect(activeTicker) {
+  const sel = document.getElementById('stock-select');
+  if (!sel) return;
+  const holdings = getHoldings().sort((a,b) => a.ticker.localeCompare(b.ticker));
+  if (!holdings.length) {
+    sel.innerHTML = '<option value="">No holdings yet</option>';
+    return;
+  }
+  sel.innerHTML = holdings.map(h =>
+    `<option value="${h.ticker}" ${h.ticker === activeTicker ? 'selected' : ''}>${h.ticker} — ${h.name || tickerName(h.ticker)}</option>`
+  ).join('');
+}
+
 function navigate(screen, ticker) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  
   document.getElementById(`screen-${screen}`).classList.add('active');
-  
+
   const addBtn = document.getElementById('add-btn');
-  
+
   if (screen === 'home') {
     document.getElementById('tab-home').classList.add('active');
     document.getElementById('header-title').textContent = 'Portfolio';
     document.getElementById('header-subtitle').style.display = 'none';
     addBtn.style.display = 'flex';
     renderHome();
+
   } else if (screen === 'detail') {
+    // If no ticker given, default to first holding alphabetically
+    if (!ticker) {
+      const holdings = getHoldings().sort((a,b) => a.ticker.localeCompare(b.ticker));
+      ticker = holdings.length ? holdings[0].ticker : null;
+    }
+    if (!ticker) {
+      // No holdings at all — show portfolio instead
+      navigate('home'); return;
+    }
     currentDetailTicker = ticker;
-    document.getElementById('tab-detail').style.display = 'flex';
     document.getElementById('tab-detail').classList.add('active');
-    document.getElementById('tab-detail-label').textContent = ticker;
+    document.getElementById('tab-detail-label').textContent = 'Stock';
     document.getElementById('header-title').textContent = ticker;
     const p = state.prices[ticker];
     document.getElementById('header-subtitle').textContent = p?.name || tickerName(ticker);
     document.getElementById('header-subtitle').style.display = 'block';
     addBtn.style.display = 'none';
+    populateStockSelect(ticker);
     renderDetail(ticker);
+
   } else if (screen === 'history') {
     document.getElementById('tab-history').classList.add('active');
     document.getElementById('header-title').textContent = 'History';
     document.getElementById('header-subtitle').style.display = 'none';
     addBtn.style.display = 'flex';
     renderHistory();
+
   } else if (screen === 'settings') {
     document.getElementById('tab-settings').classList.add('active');
     document.getElementById('header-title').textContent = 'Settings';
@@ -2262,7 +2326,6 @@ async function renderDetail(ticker) {
   const changeAmt = p?.change1d;
   const changePct = p?.changePct1d;
   header.innerHTML = `
-    <button class="back-btn" onclick="navigate('home')">←</button>
     <div class="stock-detail-info">
       <div class="stock-detail-ticker">${ticker}</div>
       <div class="stock-detail-company">${p?.name || tickerName(ticker)}</div>
@@ -2326,8 +2389,123 @@ async function renderDetail(ticker) {
     `<div class="detail-info-row"><span class="detail-info-label">${label}</span><span class="detail-info-val">${val}</span></div>`
   ).join('');
 
+  // Long-term / Short-term breakdown
+  renderLtStBreakdown(ticker, h);
+
   // Transactions for this ticker
   renderDetailTransactions(ticker);
+}
+
+function renderLtStBreakdown(ticker, holding) {
+  // Remove existing breakdown section if present
+  const existing = document.getElementById('lt-st-section');
+  if (existing) existing.remove();
+
+  if (!holding) return;
+
+  const now = new Date();
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+  // Use FIFO to determine which shares are LT vs ST
+  // Walk buys oldest-first, apply sells oldest-first, remainder = current position
+  const buys = state.transactions
+    .filter(t => t.ticker === ticker && t.type === 'buy')
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const sells = state.transactions
+    .filter(t => t.ticker === ticker && t.type === 'sell')
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  // Apply sells FIFO
+  let lots = buys.map(b => ({ ...b, remaining: b.shares }));
+  for (const sell of sells) {
+    let toSell = sell.shares;
+    for (const lot of lots) {
+      if (lot.remaining <= 0) continue;
+      const matched = Math.min(lot.remaining, toSell);
+      lot.remaining -= matched;
+      toSell -= matched;
+      if (toSell <= 0) break;
+    }
+  }
+
+  // Remaining lots — split into LT and ST
+  let ltShares = 0, stShares = 0;
+  let ltCost = 0, stCost = 0;
+  for (const lot of lots) {
+    if (lot.remaining <= 0) continue;
+    const purchaseDate = new Date(lot.date + 'T00:00:00');
+    if (purchaseDate <= oneYearAgo) {
+      ltShares += lot.remaining;
+      ltCost += lot.remaining * lot.price;
+    } else {
+      stShares += lot.remaining;
+      stCost += lot.remaining * lot.price;
+    }
+  }
+
+  const price = holding.currentPrice;
+  const ltValue = price ? ltShares * price : null;
+  const stValue = price ? stShares * price : null;
+  const ltUnrealized = ltValue != null ? ltValue - ltCost : null;
+  const stUnrealized = stValue != null ? stValue - stCost : null;
+  const totalShares = ltShares + stShares;
+  const ltPct = totalShares > 0 ? (ltShares / totalShares) * 100 : 0;
+  const stPct = totalShares > 0 ? (stShares / totalShares) * 100 : 0;
+
+  const section = document.createElement('div');
+  section.id = 'lt-st-section';
+  section.style.margin = '0 16px 16px';
+
+  section.innerHTML = `
+    <p class="section-label" style="padding:0;margin-bottom:10px">Long-Term vs Short-Term</p>
+    <!-- Visual bar -->
+    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px">
+      <div style="padding:14px 16px 10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.4px">Long-Term (&gt;1yr)</span>
+          <span style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:0.4px">Short-Term (&lt;1yr)</span>
+        </div>
+        <!-- Stacked bar -->
+        <div style="height:10px;border-radius:5px;background:var(--surface2);overflow:hidden;display:flex">
+          <div style="width:${ltPct.toFixed(1)}%;background:var(--green);border-radius:5px 0 0 5px;transition:width 0.4s"></div>
+          <div style="width:${stPct.toFixed(1)}%;background:var(--blue);border-radius:0 5px 5px 0;transition:width 0.4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">${ltPct.toFixed(0)}% · ${fmtNum(ltShares,4)} shares</span>
+          <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">${fmtNum(stShares,4)} shares · ${stPct.toFixed(0)}%</span>
+        </div>
+      </div>
+      <!-- Detail rows -->
+      <div style="border-top:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+          <div style="padding:12px 16px;border-right:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Long-Term</div>
+            <div style="font-size:15px;font-weight:600;font-family:var(--mono)">${fmtNum(ltShares,4)} <span style="font-size:11px;color:var(--text3)">shares</span></div>
+            <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:2px">Cost ${fmt$(ltCost)}</div>
+            ${ltValue != null ? `<div style="font-size:12px;font-family:var(--mono);margin-top:2px;color:${ltUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}">${ltUnrealized >= 0 ? '+' : ''}${fmt$(ltUnrealized)} P&L</div>` : ''}
+          </div>
+          <div style="padding:12px 16px">
+            <div style="font-size:11px;color:var(--blue);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Short-Term</div>
+            <div style="font-size:15px;font-weight:600;font-family:var(--mono)">${fmtNum(stShares,4)} <span style="font-size:11px;color:var(--text3)">shares</span></div>
+            <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:2px">Cost ${fmt$(stCost)}</div>
+            ${stValue != null ? `<div style="font-size:12px;font-family:var(--mono);margin-top:2px;color:${stUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}">${stUnrealized >= 0 ? '+' : ''}${fmt$(stUnrealized)} P&L</div>` : ''}
+          </div>
+        </div>
+        <div style="padding:10px 16px;font-size:11px;color:var(--text3);line-height:1.5">
+          Long-term gains (&gt;1 year) are taxed at preferential capital gains rates. Short-term gains are taxed as ordinary income.
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Insert before the purchase history section label
+  const historyLabel = document.querySelector('#screen-detail .section-label:last-of-type');
+  if (historyLabel) {
+    historyLabel.parentNode.insertBefore(section, historyLabel);
+  } else {
+    document.getElementById('screen-detail').appendChild(section);
+  }
 }
 
 async function loadChart(ticker, period, btnEl) {
