@@ -1793,7 +1793,7 @@ let state = {
   transactions: [], // {id, ticker, type:'buy'|'sell', shares, price, date, timestamp}
   prices: {},       // {TICKER: {price, prevClose, open, week52H, week52L, mktCap, pe, name}}
   settings: {
-    sheetsUrl: '',
+    sheetsUrl: 'https://script.google.com/macros/s/AKfycbwxq51qnAJkc6jtRq5IaohJsFnSR62tQSHH-eMBGahMhz2wvaGeX-8NIYjdcoKVZcSo/exec',
     apiKey: '7CEQOA1NBV1XNPB0',
     lastRefresh: null
   }
@@ -1829,8 +1829,9 @@ function load() {
     if (pr) state.prices = JSON.parse(pr);
     if (se) {
       const saved = JSON.parse(se);
-      // Don't overwrite the hard-coded API key with a blank saved value
+      // Don't overwrite hard-coded defaults with blank saved values
       if (!saved.apiKey) saved.apiKey = state.settings.apiKey;
+      if (!saved.sheetsUrl) saved.sheetsUrl = state.settings.sheetsUrl;
       state.settings = { ...state.settings, ...saved };
     }
   } catch(e) {}
