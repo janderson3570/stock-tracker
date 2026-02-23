@@ -344,6 +344,12 @@
     white-space: nowrap;
   }
   .change-pill.positive { background: var(--green-bg); color: var(--green); }
+  .sub-row td { background: var(--surface2) !important; font-size: 12px; }
+  .sub-row td:first-child { padding-left: 32px !important; }
+  .lot-chevron { display:inline-block; transition: transform 0.2s; margin-right:6px; font-size:10px; color:var(--text3); cursor:pointer; }
+  .lot-chevron.open { transform: rotate(90deg); }
+  tr.expandable-row { cursor: pointer; }
+  tr.expandable-row:hover td { background: var(--surface2); }
   .change-pill.negative { background: var(--red-bg); color: var(--red); }
   .change-pill.neutral { background: var(--surface2); color: var(--text3); }
 
@@ -1821,6 +1827,7 @@ let viewMode = 'total'; // 'total' | 'per'
 let changePeriod = '1d';
 let sortCol = 'ticker';
 let sortDir = 1;
+let expandedRows = new Set(); // tickers with expanded lot sub-rows
 let currentDetailTicker = null;
 let currentEditId = null;
 let confirmCallback = null;
@@ -2167,6 +2174,49 @@ async function fetchPricesBatch(tickers) {
   return results;
 }
 
+// Fetch company profile from Finnhub for 52W high/low, market cap, P/E
+async function fetchCompanyProfile(ticker) {
+  const key = state.settings.apiKey;
+  if (!key) return;
+  try {
+    const [metricRes, quoteRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${key}`).then(r=>r.json()),
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${key}`).then(r=>r.json())
+    ]);
+    if (!state.prices[ticker]) return;
+    const m = metricRes.metric || {};
+    if (m['52WeekHigh'])  state.prices[ticker].week52H = m['52WeekHigh'];
+    if (m['52WeekLow'])   state.prices[ticker].week52L = m['52WeekLow'];
+    if (m['marketCapitalization']) state.prices[ticker].mktCap = m['marketCapitalization'] * 1e6;
+    if (m['peBasicExclExtraTTM'])  state.prices[ticker].pe = m['peBasicExclExtraTTM'];
+    save();
+    // Re-render info card
+    const infoCard = document.getElementById('detail-info-card');
+    const p = state.prices[ticker];
+    const holdings = getHoldings();
+    const h = holdings.find(x => x.ticker === ticker);
+    if (infoCard && p) {
+      const infoRows = [];
+      if (p.open)      infoRows.push(['Open',       fmt$(p.open)]);
+      if (p.high)      infoRows.push(['Day High',   fmt$(p.high)]);
+      if (p.low)       infoRows.push(['Day Low',    fmt$(p.low)]);
+      if (p.prevClose) infoRows.push(['Prev Close', fmt$(p.prevClose)]);
+      if (p.week52H)   infoRows.push(['52W High',   fmt$(p.week52H)]);
+      if (p.week52L)   infoRows.push(['52W Low',    fmt$(p.week52L)]);
+      if (p.mktCap)    infoRows.push(['Market Cap', fmt$K(p.mktCap)]);
+      if (p.pe)        infoRows.push(['P/E Ratio',  fmtNum(p.pe, 2)]);
+      if (h) {
+        infoRows.push(['Shares Held', fmtNum(h.shares, 6)]);
+        infoRows.push(['Cost Basis',  fmt$(h.costBasis)]);
+        infoRows.push(['Realized P&L', (h.realizedGain>=0?'+':'')+fmt$(h.realizedGain)]);
+      }
+      infoCard.innerHTML = infoRows.map(([label, val]) =>
+        `<div class="detail-info-row"><span class="detail-info-label">${label}</span><span class="detail-info-val">${val}</span></div>`
+      ).join('');
+    }
+  } catch(e) {}
+}
+
 async function fetchHistoricalPrices(ticker, period) {
   const key = state.settings.apiKey;
   if (!key) return generateMockChart(ticker, period);
@@ -2270,16 +2320,47 @@ async function refreshAllPrices() {
   }
 }
 
-// Change % by period
+// Change % by period — uses live 1d data or cached period snapshots
 function getPriceChange(ticker, period) {
   const p = state.prices[ticker];
   if (!p || !p.price) return null;
-  
   if (period === '1d') {
+    if (p.change1d == null) return null;
     return { amt: p.change1d, pct: p.changePct1d };
   }
-  // For other periods we'd need historical — show N/A if no data
-  return null;
+  // For other periods, use stored period open prices (populated by fetchPeriodChange)
+  const snap = p.periodSnaps && p.periodSnaps[period];
+  if (!snap) return null;
+  const amt = p.price - snap;
+  const pct = snap > 0 ? (amt / snap) * 100 : 0;
+  return { amt, pct };
+}
+
+// Fetch the opening price for a given period so we can show period change.
+// Called lazily when changePeriod changes.
+async function fetchPeriodChange(ticker, period) {
+  const key = state.settings.apiKey;
+  const p = state.prices[ticker];
+  if (!key || !p || period === '1d') return;
+  // Already have it
+  if (p.periodSnaps && p.periodSnaps[period]) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const offsets = { '1w': 7, '1m': 30, '1y': 365 };
+  const days = offsets[period] || 7;
+  const from = now - days * 86400;
+
+  try {
+    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from}&to=${now}&token=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    if (data.s !== 'ok' || !data.o || !data.o.length) return;
+    // Use the open of the first candle in the period as baseline
+    const openPrice = data.o[0];
+    if (!state.prices[ticker].periodSnaps) state.prices[ticker].periodSnaps = {};
+    state.prices[ticker].periodSnaps[period] = openPrice;
+    save();
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2364,6 +2445,11 @@ function setChangePeriod(p, btn) {
   changePeriod = p;
   document.querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  // Fetch period open prices for all holdings if needed
+  if (p !== '1d') {
+    const tickers = [...new Set(state.transactions.map(t => t.ticker))];
+    Promise.all(tickers.map(t => fetchPeriodChange(t, p))).then(() => renderHoldingsTable());
+  }
   renderHoldingsTable();
 }
 
@@ -2481,10 +2567,11 @@ function renderHoldingsTable() {
   const holdings = getHoldings();
   const thead = document.getElementById('table-head-row');
   const tbody = document.getElementById('holdings-body');
+  const periodLabel = changePeriod === '1d' ? '24h' : changePeriod.toUpperCase();
 
   if (!holdings.length) {
     thead.innerHTML = '';
-    tbody.innerHTML = `<tr><td colspan="5" style="padding:0">
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:0">
       <div class="empty-state">
         <div class="icon">📊</div>
         <h3>No holdings yet</h3>
@@ -2494,97 +2581,164 @@ function renderHoldingsTable() {
     return;
   }
 
-  // Define columns based on viewMode — Change col is now sortable
   const isTotal = viewMode === 'total';
+
+  // ── Column definitions ──
   const cols = isTotal ? [
-    {key:'ticker',       label:'Ticker',   sortable:true},
-    {key:'currentValue', label:'Value',    sortable:true,  right:true},
-    {key:'costBasis',    label:'Invested', sortable:true,  right:true},
-    {key:'unrealized',   label:'P&L',      sortable:true,  right:true},
-    {key:'changePct1d',  label:'Change',   sortable:true,  right:true},
+    {key:'ticker',       label:'Ticker',              sortable:true},
+    {key:'currentValue', label:'Value',               sortable:true, right:true},
+    {key:'costBasis',    label:'Invested',            sortable:true, right:true},
+    {key:'unrealized',   label:'Total Change',        sortable:true, right:true},
+    {key:'periodChange', label:`${periodLabel} Change`, sortable:true, right:true},
   ] : [
-    {key:'ticker',       label:'Ticker',   sortable:true},
-    {key:'shares',       label:'Shares',   sortable:true,  right:true},
-    {key:'avgCost',      label:'Avg Cost', sortable:true,  right:true},
-    {key:'currentPrice', label:'Price',    sortable:true,  right:true},
-    {key:'unrealizedPct',label:'P&L%',     sortable:true,  right:true},
-    {key:'changePct1d',  label:'Change',   sortable:true,  right:true},
+    {key:'ticker',       label:'Ticker',              sortable:true},
+    {key:'currentPrice', label:'Price',               sortable:true, right:true},
+    {key:'avgCost',      label:'Avg Cost',            sortable:true, right:true},
+    {key:'unrealized',   label:'Total Change',        sortable:true, right:true},
+    {key:'periodChange', label:`${periodLabel} Change`, sortable:true, right:true},
   ];
 
-  // Attach changePct1d to each holding for sorting
+  // ── Attach period change to each holding ──
   const holdingsWithChange = holdings.map(h => {
     const ch = getPriceChange(h.ticker, changePeriod);
-    return { ...h, changePct1d: ch ? ch.pct : null, changeAmt1d: ch ? ch.amt : null };
+    return { ...h, periodChange: ch ? ch.pct : null, periodChangeAmt: ch ? ch.amt : null };
   });
 
+  // ── Header ──
   thead.innerHTML = cols.map(c => `
     <th class="${c.right?'right':''} ${sortCol===c.key?'sorted':''}"
         ${c.sortable ? `onclick="sortTable('${c.key}')"` : ''}>
       ${c.label}${c.sortable && sortCol===c.key ? `<span class="sort-arrow">${sortDir===1?'↓':'↑'}</span>` : ''}
     </th>`).join('');
 
-  // Sort — default direction is DESCENDING (highest value first) for numeric cols
+  // ── Sort ──
   let sorted = [...holdingsWithChange];
   sorted.sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
-    if (sortCol === 'ticker') {
-      // Ticker sorts A→Z ascending (dir=1), Z→A descending (dir=-1)
-      return sortDir * (va || '').localeCompare(vb || '');
-    }
-    // Numeric: nulls always go to bottom regardless of direction
+    if (sortCol === 'ticker') return sortDir * (va||'').localeCompare(vb||'');
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
-    return sortDir * (vb - va); // note: vb-va so dir=1 = descending (high→low)
+    return sortDir * (vb - va);
   });
 
-  tbody.innerHTML = sorted.map(h => {
-    const changePill = h.changePct1d != null
-      ? `<span class="change-pill ${signClass(h.changeAmt1d)}">${h.changeAmt1d >= 0 ? '+' : ''}${h.changePct1d?.toFixed(2)}%</span>`
-      : `<span class="change-pill neutral">N/A</span>`;
+  // ── Build rows ──
+  const rows = [];
+  for (const h of sorted) {
+    const periodPill = h.periodChange != null
+      ? `<span class="change-pill ${signClass(h.periodChangeAmt)}">${h.periodChangeAmt >= 0 ? '+' : ''}${h.periodChange.toFixed(2)}%</span>`
+      : `<span class="change-pill neutral">—</span>`;
+
+    // Get buy lots for this ticker (for dropdown)
+    const lots = state.transactions
+      .filter(t => t.ticker === h.ticker && t.type === 'buy')
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+    const isExpanded = expandedRows.has(h.ticker);
+    const hasMultiple = lots.length > 1;
+    const chevron = hasMultiple
+      ? `<span class="lot-chevron${isExpanded?' open':''}" onclick="toggleExpand('${h.ticker}',event)">▶</span>`
+      : `<span style="display:inline-block;width:14px;margin-right:6px"></span>`;
 
     if (isTotal) {
       const plSign = h.unrealized != null ? signClass(h.unrealized) : '';
-      return `<tr onclick="navigate('detail','${h.ticker}')">
+      const plStr  = h.unrealized != null
+        ? `<span class="${plSign}" style="font-weight:600">${h.unrealized>=0?'+':''}${fmt$(h.unrealized)}<br><span style="font-size:10px;font-weight:400">${h.unrealizedPct!=null?fmtPct(h.unrealizedPct):''}</span></span>`
+        : '—';
+
+      rows.push(`<tr class="expandable-row" onclick="navigate('detail','${h.ticker}')">
         <td>
           <div class="ticker-cell">
-            <span class="ticker-name">${h.ticker}</span>
-            <span class="ticker-shares">${fmtNum(h.shares,4)} shares</span>
+            <div style="display:flex;align-items:center">${chevron}<span class="ticker-name">${h.ticker}</span></div>
+            <span class="ticker-shares" style="padding-left:20px">${fmtNum(h.shares,4)} shares</span>
           </div>
         </td>
         <td class="right price-cell">${h.currentValue != null ? fmt$(h.currentValue) : '<span style="color:var(--text3);font-size:12px">No price</span>'}</td>
         <td class="right price-cell">${fmt$(h.costBasis)}</td>
-        <td class="right price-cell ${plSign}" style="font-weight:600">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</td>
-        <td class="right">${changePill}</td>
-      </tr>`;
+        <td class="right price-cell">${plStr}</td>
+        <td class="right">${periodPill}</td>
+      </tr>`);
     } else {
-      const plPct = h.unrealizedPct;
-      const plSign = plPct != null ? signClass(plPct) : '';
-      return `<tr onclick="navigate('detail','${h.ticker}')">
+      // /share view: shares under ticker, then Price | Avg Cost | Total Change | Period Change
+      const plPct   = h.unrealizedPct;
+      const plSign  = plPct != null ? signClass(plPct) : '';
+      const plStr   = plPct != null
+        ? `<span class="${plSign}" style="font-weight:600">${fmtPct(plPct)}<br><span style="font-size:10px;font-weight:400">${h.unrealized!=null?(h.unrealized>=0?'+':'')+fmt$(h.unrealized):''}</span></span>`
+        : '—';
+
+      rows.push(`<tr class="expandable-row" onclick="navigate('detail','${h.ticker}')">
         <td>
           <div class="ticker-cell">
-            <span class="ticker-name">${h.ticker}</span>
-            <span class="ticker-shares" style="font-size:10px;color:var(--text3)">${h.name?.substring(0,18)}</span>
+            <div style="display:flex;align-items:center">${chevron}<span class="ticker-name">${h.ticker}</span></div>
+            <span class="ticker-shares" style="padding-left:20px">${fmtNum(h.shares,4)} shares</span>
           </div>
         </td>
-        <td class="right price-cell">${fmtNum(h.shares,4)}</td>
-        <td class="right price-cell">${fmt$(h.avgCost)}</td>
         <td class="right price-cell">${h.currentPrice != null ? fmt$(h.currentPrice) : '<span style="color:var(--text3);font-size:12px">No price</span>'}</td>
-        <td class="right price-cell ${plSign}" style="font-weight:600">${plPct != null ? fmtPct(plPct) : '—'}</td>
-        <td class="right">${changePill}</td>
-      </tr>`;
+        <td class="right price-cell">${fmt$(h.avgCost)}</td>
+        <td class="right price-cell">${plStr}</td>
+        <td class="right">${periodPill}</td>
+      </tr>`);
     }
-  }).join('');
+
+    // ── Sub-rows (lot breakdown) ──
+    if (isExpanded && hasMultiple) {
+      for (const lot of lots) {
+        const lotCurrent = h.currentPrice;
+        const lotVal     = lotCurrent ? lot.shares * lotCurrent : null;
+        const lotCost    = lot.shares * lot.price;
+        const lotPL      = lotVal != null ? lotVal - lotCost : null;
+        const lotPLPct   = lotPL != null && lotCost > 0 ? (lotPL/lotCost)*100 : null;
+        const lotSign    = lotPL != null ? signClass(lotPL) : '';
+
+        if (isTotal) {
+          const lotPlStr = lotPL != null
+            ? `<span class="${lotSign}" style="font-weight:600">${lotPL>=0?'+':''}${fmt$(lotPL)}<br><span style="font-size:10px;font-weight:400">${lotPLPct!=null?fmtPct(lotPLPct):''}</span></span>`
+            : '—';
+          rows.push(`<tr class="sub-row" onclick="event.stopPropagation()">
+            <td>
+              <div class="ticker-cell">
+                <span class="ticker-name" style="font-size:12px">${fmtDate(lot.date)}</span>
+                <span class="ticker-shares">${fmtNum(lot.shares,4)} shares @ ${fmt$(lot.price)}</span>
+              </div>
+            </td>
+            <td class="right price-cell">${lotVal != null ? fmt$(lotVal) : '—'}</td>
+            <td class="right price-cell">${fmt$(lotCost)}</td>
+            <td class="right price-cell">${lotPlStr}</td>
+            <td class="right"><span class="change-pill neutral">lot</span></td>
+          </tr>`);
+        } else {
+          const lotPlPctStr = lotPLPct != null
+            ? `<span class="${lotSign}" style="font-weight:600">${fmtPct(lotPLPct)}<br><span style="font-size:10px;font-weight:400">${lotPL!=null?(lotPL>=0?'+':'')+fmt$(lotPL):''}</span></span>`
+            : '—';
+          rows.push(`<tr class="sub-row" onclick="event.stopPropagation()">
+            <td>
+              <div class="ticker-cell">
+                <span class="ticker-name" style="font-size:12px">${fmtDate(lot.date)}</span>
+                <span class="ticker-shares">${fmtNum(lot.shares,4)} shares</span>
+              </div>
+            </td>
+            <td class="right price-cell">${lotCurrent != null ? fmt$(lotCurrent) : '—'}</td>
+            <td class="right price-cell">${fmt$(lot.price)}</td>
+            <td class="right price-cell">${lotPlPctStr}</td>
+            <td class="right"><span class="change-pill neutral">lot</span></td>
+          </tr>`);
+        }
+      }
+    }
+  }
+
+  tbody.innerHTML = rows.join('');
+}
+
+function toggleExpand(ticker, event) {
+  event.stopPropagation();
+  if (expandedRows.has(ticker)) expandedRows.delete(ticker);
+  else expandedRows.add(ticker);
+  renderHoldingsTable();
 }
 
 function sortTable(col) {
-  if (sortCol === col) {
-    sortDir *= -1;
-  } else {
-    sortCol = col;
-    // Ticker defaults ascending (A first); all numeric cols default descending (highest first)
-    sortDir = col === 'ticker' ? 1 : 1;
-  }
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
   renderHoldingsTable();
 }
 
@@ -2601,6 +2755,10 @@ async function renderDetail(ticker) {
   const price = p?.price;
   const changeAmt = p?.change1d;
   const changePct = p?.changePct1d;
+  const avgCost = h?.avgCost;
+  const priceDiff = (price && avgCost) ? price - avgCost : null;
+  const priceDiffPct = (priceDiff != null && avgCost > 0) ? (priceDiff / avgCost) * 100 : null;
+
   header.innerHTML = `
     <div class="stock-detail-info">
       <div class="stock-detail-ticker">${ticker}</div>
@@ -2611,6 +2769,32 @@ async function renderDetail(ticker) {
       ${changeAmt != null ? `<div class="stock-detail-price-change ${signClass(changeAmt)}">${changeAmt>=0?'+':''}${fmt$(changeAmt)} (${fmtPct(changePct)}) today</div>` : ''}
     </div>
   `;
+
+  // Prominent price comparison bar (only when holding)
+  let priceBarEl = document.getElementById('detail-price-bar');
+  if (!priceBarEl) {
+    priceBarEl = document.createElement('div');
+    priceBarEl.id = 'detail-price-bar';
+    priceBarEl.style.cssText = 'margin:0 16px 16px;display:flex;gap:10px';
+    const kpiEl = document.getElementById('detail-kpis');
+    kpiEl.parentNode.insertBefore(priceBarEl, kpiEl);
+  }
+  if (h && price) {
+    priceBarEl.innerHTML = `
+      <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:4px">Current Price</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text)">${fmt$(price)}</div>
+        ${changeAmt != null ? `<div style="font-size:12px;font-weight:500;margin-top:2px" class="${signClass(changeAmt)}">${changeAmt>=0?'+':''}${fmt$(changeAmt)} today</div>` : ''}
+      </div>
+      <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:4px">Your Avg Cost</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text)">${fmt$(avgCost)}</div>
+        ${priceDiff != null ? `<div style="font-size:12px;font-weight:500;margin-top:2px" class="${signClass(priceDiff)}">${priceDiff>=0?'+':''}${fmt$(priceDiff)} (${fmtPct(priceDiffPct)})</div>` : ''}
+      </div>
+    `;
+  } else {
+    priceBarEl.innerHTML = '';
+  }
 
   // KPIs
   const kpiEl = document.getElementById('detail-kpis');
@@ -2647,23 +2831,33 @@ async function renderDetail(ticker) {
   // Load chart
   await loadChart(ticker, chartPeriod);
 
-  // Stock info card
+  // Stock info card — only show fields available from Finnhub
   const infoCard = document.getElementById('detail-info-card');
-  const rows = [
-    ['Open', p?.open ? fmt$(p.open) : '—'],
-    ['Day High', p?.high ? fmt$(p.high) : '—'],
-    ['Day Low', p?.low ? fmt$(p.low) : '—'],
-    ['Volume', p?.volume ? fmtNum(p.volume, 0) : '—'],
-    ['52W High', p?.week52H ? fmt$(p.week52H) : '—'],
-    ['52W Low', p?.week52L ? fmt$(p.week52L) : '—'],
-    ['Market Cap', p?.mktCap ? fmt$K(p.mktCap) : '—'],
-    ['P/E Ratio', p?.pe ? fmtNum(p.pe, 2) : '—'],
-    ['Avg Cost (you)', h ? fmt$(h.avgCost) : '—'],
-    ['Shares Held', h ? fmtNum(h.shares, 6) : '—'],
-  ];
-  infoCard.innerHTML = rows.map(([label, val]) =>
-    `<div class="detail-info-row"><span class="detail-info-label">${label}</span><span class="detail-info-val">${val}</span></div>`
-  ).join('');
+  const infoRows = [];
+  if (p?.open)  infoRows.push(['Open',     fmt$(p.open)]);
+  if (p?.high)  infoRows.push(['Day High', fmt$(p.high)]);
+  if (p?.low)   infoRows.push(['Day Low',  fmt$(p.low)]);
+  if (p?.prevClose) infoRows.push(['Prev Close', fmt$(p.prevClose)]);
+  // 52W and market cap come from company profile — show if cached
+  if (p?.week52H) infoRows.push(['52W High',   fmt$(p.week52H)]);
+  if (p?.week52L) infoRows.push(['52W Low',    fmt$(p.week52L)]);
+  if (p?.mktCap)  infoRows.push(['Market Cap', fmt$K(p.mktCap)]);
+  if (p?.pe)      infoRows.push(['P/E Ratio',  fmtNum(p.pe, 2)]);
+  if (h) {
+    infoRows.push(['Shares Held', fmtNum(h.shares, 6)]);
+    infoRows.push(['Cost Basis',  fmt$(h.costBasis)]);
+    infoRows.push(['Realized P&L', (h.realizedGain>=0?'+':'')+fmt$(h.realizedGain)]);
+  }
+  infoCard.innerHTML = infoRows.length
+    ? infoRows.map(([label, val]) =>
+        `<div class="detail-info-row"><span class="detail-info-label">${label}</span><span class="detail-info-val">${val}</span></div>`
+      ).join('')
+    : '<div class="detail-info-row"><span class="detail-info-label" style="color:var(--text3)">No additional data available</span></div>';
+
+  // Fetch company profile for 52W/market cap if not yet cached
+  if (state.settings.apiKey && p && (!p.week52H || !p.mktCap)) {
+    fetchCompanyProfile(ticker);
+  }
 
   // Long-term / Short-term breakdown
   renderLtStBreakdown(ticker, h);
@@ -2998,14 +3192,55 @@ function showChartTooltip(text, x, y) {
 function renderDetailTransactions(ticker) {
   const txs = state.transactions
     .filter(t => t.ticker === ticker)
-    .sort((a,b) => b.timestamp - a.timestamp);
-  
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+
   const el = document.getElementById('detail-tx-list');
   if (!txs.length) {
     el.innerHTML = '<div class="empty-state" style="padding:24px"><p>No transactions for this stock</p></div>';
     return;
   }
-  el.innerHTML = txs.map(tx => buildTxCard(tx, true)).join('');
+
+  const currentPrice = state.prices[ticker]?.price;
+
+  el.innerHTML = txs.map(tx => {
+    const total = tx.shares * tx.price;
+    const currentVal = currentPrice ? tx.shares * currentPrice : null;
+    const gain = currentVal != null ? currentVal - total : null;
+    const gainPct = gain != null && total > 0 ? (gain / total) * 100 : null;
+    const gainSign = gain != null ? signClass(gain) : '';
+    const isBuy = tx.type === 'buy';
+
+    return `<div class="transaction-card" style="flex-direction:column;gap:0;padding:0;overflow:hidden">
+      <!-- Top row: dot + ticker + badge + edit -->
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px 8px">
+        <div class="tx-dot ${tx.type}"></div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-weight:600;font-size:14px">${fmtDate(tx.date)}</span>
+            <span class="tx-badge ${tx.type}">${tx.type.toUpperCase()}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${fmtNum(tx.shares,6)} shares @ ${fmt$(tx.price)} = ${isBuy?'-':'+'}${fmt$(total)}</div>
+        </div>
+        <button class="tx-edit-btn" onclick="openEditModal('${tx.id}')">✏️</button>
+      </div>
+      ${isBuy && currentPrice ? `
+      <!-- Performance row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border);background:var(--surface2)">
+        <div style="padding:10px 14px;border-right:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Current Value</div>
+          <div style="font-size:13px;font-weight:600;font-family:var(--mono);margin-top:2px">${fmt$(currentVal)}</div>
+        </div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Gain / Loss</div>
+          <div style="font-size:13px;font-weight:600;font-family:var(--mono);margin-top:2px" class="${gainSign}">${gain>=0?'+':''}${fmt$(gain)}</div>
+        </div>
+        <div style="padding:10px 14px">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Return</div>
+          <div style="font-size:13px;font-weight:600;font-family:var(--mono);margin-top:2px" class="${gainSign}">${fmtPct(gainPct)}</div>
+        </div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
