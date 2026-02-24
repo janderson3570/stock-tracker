@@ -60,7 +60,7 @@
     display: flex;
     flex-direction: column;
     padding-top: env(safe-area-inset-top, 0px);
-    /* Must clip children so flex layout fills exactly to bottom edge */
+    /* Do NOT add padding-bottom here — the tab bar handles safe-area itself */
     overflow: hidden;
   }
 
@@ -133,8 +133,10 @@
     display: flex;
     align-items: flex-start;
     padding-top: 8px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
     z-index: 10;
+    /* Ensure it always sticks to the very bottom */
+    position: relative;
   }
   .tab-btn {
     flex: 1;
@@ -1212,7 +1214,7 @@
 
       <!-- News Feed Accounts -->
       <div class="settings-section">
-        <div class="settings-section-title">News Feed Accounts</div>
+        <div class="settings-section-title">News Feed</div>
         <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
           <div class="settings-row-label">Twitter / X Accounts</div>
           <div id="twitter-accounts-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px"></div>
@@ -1223,7 +1225,7 @@
               onkeydown="if(event.key==='Enter')addTwitterAccount()">
             <button class="settings-btn primary" onclick="addTwitterAccount()" style="flex-shrink:0;white-space:nowrap">Add</button>
           </div>
-          <div style="font-size:11px;color:var(--text3)">Accounts appear as embedded feeds on the News tab.</div>
+          <div style="font-size:11px;color:var(--text3)">Saved for reference. News tab now shows financial news via Finnhub API.</div>
         </div>
       </div>
 
@@ -2256,39 +2258,56 @@ async function fetchCompanyProfile(ticker) {
 
 async function fetchHistoricalPrices(ticker, period) {
   const key = state.settings.apiKey;
-  if (!key) return generateMockChart(ticker, period);
+  if (!key) {
+    showToast('Add API key in Settings to view charts', 'error');
+    return null;
+  }
 
   try {
     // Map period to days back and resolution
     const now = Math.floor(Date.now() / 1000);
     let from, resolution;
-    if      (period === '1D') { from = now - 86400;        resolution = '60'; }
-    else if (period === '1W') { from = now - 7*86400;      resolution = 'D';  }
-    else if (period === '1M') { from = now - 30*86400;     resolution = 'D';  }
-    else if (period === '3M') { from = now - 90*86400;     resolution = 'D';  }
-    else if (period === '6M') { from = now - 180*86400;    resolution = 'D';  }
-    else if (period === '1Y') { from = now - 365*86400;    resolution = 'W';  }
-    else                      { from = now - 5*365*86400;  resolution = 'M';  }
+    if      (period === '1D') { from = now - 2*86400;       resolution = '60'; }   // 2 days back to get full day
+    else if (period === '1W') { from = now - 8*86400;       resolution = 'D';  }
+    else if (period === '1M') { from = now - 32*86400;      resolution = 'D';  }
+    else if (period === '3M') { from = now - 95*86400;      resolution = 'D';  }
+    else if (period === '6M') { from = now - 185*86400;     resolution = 'D';  }
+    else if (period === '1Y') { from = now - 370*86400;     resolution = 'W';  }
+    else                      { from = now - 5*370*86400;   resolution = 'M';  }
 
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${now}&token=${key}`;
     const r = await fetch(url);
     const data = await r.json();
 
-    if (data.s !== 'ok' || !data.c || !data.t) return generateMockChart(ticker, period);
+    if (data.s !== 'ok' || !data.c || !data.t || data.c.length === 0) {
+      // Real API returned no data (market closed on weekend for 1D, etc.)
+      // Show a clear message rather than fake data
+      return null;
+    }
 
     const points = data.t.map((ts, i) => ({
       date:  new Date(ts * 1000).toISOString().split('T')[0],
       price: data.c[i]
     }));
     points.sort((a, b) => a.date.localeCompare(b.date));
+
+    // For 1D intraday, filter to only today and yesterday
+    if (period === '1D') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const filtered = points.filter(p => p.date === todayStr || p.date === yday);
+      return filtered.length > 0 ? filtered : points.slice(-24);
+    }
+
     return points;
   } catch(e) {
-    return generateMockChart(ticker, period);
+    console.error('fetchHistoricalPrices error:', e);
+    return null;
   }
 }
 
 function generateMockChart(ticker, period) {
-  // Generate plausible mock data based on current price
+  // Only used as a labeled fallback when API key is missing
   const basePrice = state.prices[ticker]?.price || 100;
   const days = period === '1D' ? 1 : period === '1W' ? 7 :
                period === '1M' ? 30 : period === '3M' ? 90 :
@@ -2303,7 +2322,6 @@ function generateMockChart(ticker, period) {
     price = Math.max(price, 0.01);
     points.push({ date: d.toISOString().split('T')[0], price: +price.toFixed(2) });
   }
-  // Ensure last point matches current price
   if (points.length) points[points.length-1].price = basePrice;
   return points;
 }
@@ -2384,8 +2402,8 @@ async function fetchPeriodChange(ticker, period) {
 
   const now = Math.floor(Date.now() / 1000);
   // Go back slightly further than needed so we always get at least one candle
-  const offsets = { '1w': 9, '1m': 35, '1y': 370 };
-  const days = offsets[period] || 9;
+  const offsets = { '1w': 10, '1m': 38, '1y': 375 };
+  const days = offsets[period] || 10;
   const from = now - days * 86400;
 
   try {
@@ -2394,7 +2412,6 @@ async function fetchPeriodChange(ticker, period) {
     const data = await r.json();
     if (data.s !== 'ok' || !data.c || !data.c.length) return;
     // Use the close of the FIRST candle in the range as the "price N days ago"
-    // This is more accurate than using open price
     const basePrice = data.c[0];
     if (!basePrice || basePrice === 0) return;
     if (!state.prices[ticker].periodSnaps) state.prices[ticker].periodSnaps = {};
@@ -2483,14 +2500,15 @@ function navigate(screen, ticker) {
 // ═══════════════════════════════════════════════════════════════
 function setViewMode(mode, btn) {
   viewMode = mode;
-  document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+  // Only reset buttons within the same toggle group, not all toggle-btns on the page
+  btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderHoldingsTable();
 }
 
 function setChangePeriod(p, btn) {
   changePeriod = p;
-  document.querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
+  btn.closest('.change-period-bar').querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
 
   if (p === '1d') {
@@ -3085,8 +3103,55 @@ async function loadChart(ticker, period, btnEl) {
     document.querySelectorAll('.chart-period-btn').forEach(b=>b.classList.remove('active'));
     btnEl.classList.add('active');
   }
+
+  // Show loading state
+  const canvas = document.getElementById('chart-canvas');
+  const wrap = document.getElementById('detail-chart-wrap');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.offsetWidth || 300;
+    const H = 210;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#9b9b93';
+    ctx.font = "13px 'DM Sans', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Loading chart…', W/2, H/2);
+  }
+
   const data = await fetchHistoricalPrices(ticker, period);
   chartData = data;
+
+  if (!data || data.length === 0) {
+    // Show no-data state on canvas
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const W = canvas.parentElement.offsetWidth || 300;
+      const H = 210;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#9b9b93';
+      ctx.font = "13px 'DM Sans', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('No chart data available for this period', W/2, H/2 - 10);
+      ctx.font = "11px 'DM Sans', sans-serif";
+      ctx.fillText('(Market may be closed or API limit reached)', W/2, H/2 + 12);
+    }
+    return;
+  }
+
   drawChart(data);
 }
 
@@ -3377,61 +3442,122 @@ function buildTxCard(tx, showEdit=false) {
 // ═══════════════════════════════════════════════════════════════
 // RENDER NEWS
 // ═══════════════════════════════════════════════════════════════
-function renderNews() {
-  const accounts = state.settings.twitterAccounts || [];
+// ═══════════════════════════════════════════════════════════════
+// RENDER NEWS — uses Finnhub news API (free tier)
+// ═══════════════════════════════════════════════════════════════
+async function renderNews() {
   const container = document.getElementById('news-feeds-container');
   const countEl   = document.getElementById('news-account-count');
   if (!container) return;
 
-  if (countEl) countEl.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+  const key = state.settings.apiKey;
+  const holdings = getHoldings();
+  const tickers = holdings.map(h => h.ticker);
 
-  if (!accounts.length) {
+  if (!key) {
     container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
       <div class="icon">📰</div>
-      <h3>No accounts added</h3>
-      <p>Add Twitter accounts in Settings to see their feeds here</p>
+      <h3>API key needed</h3>
+      <p>Add your Finnhub API key in Settings to load financial news</p>
     </div>`;
+    if (countEl) countEl.textContent = '';
     return;
   }
 
-  // Build a card per account with the Twitter embed widget
-  container.innerHTML = accounts.map(handle => `
-    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text)" style="flex-shrink:0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-          <span style="font-weight:600;font-size:14px">@${handle}</span>
-        </div>
-        <a href="https://x.com/${handle}" target="_blank"
-           style="font-size:11px;color:var(--text3);text-decoration:none;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">
-          Open ↗
-        </a>
-      </div>
-      <div style="max-height:600px;overflow-y:auto;-webkit-overflow-scrolling:touch">
-        <a class="twitter-timeline"
-           data-height="600"
-           data-theme="light"
-           data-chrome="noheader nofooter noborders"
-           href="https://twitter.com/${handle}">
-          <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Loading @${handle}…</div>
-        </a>
+  // Show loading state
+  container.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">
+    <div style="font-size:24px;margin-bottom:10px">📰</div>
+    Loading news…
+  </div>`;
+  if (countEl) countEl.textContent = '';
+
+  try {
+    // Fetch general market news + news for each holding
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date(Date.now() - 7*86400*1000).toISOString().split('T')[0];
+
+    // General market news
+    const marketNewsUrl = `https://finnhub.io/api/v1/news?category=general&token=${key}`;
+    const promises = [fetch(marketNewsUrl).then(r=>r.json()).catch(()=>[])];
+
+    // Per-ticker company news (up to 3 holdings)
+    for (const ticker of tickers.slice(0, 4)) {
+      const url = `https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${weekAgo}&to=${today}&token=${key}`;
+      promises.push(fetch(url).then(r=>r.json()).then(arr => ({ ticker, items: arr })).catch(()=>({ ticker, items: [] })));
+    }
+
+    const results = await Promise.all(promises);
+    const marketNews = Array.isArray(results[0]) ? results[0].slice(0, 8) : [];
+    const stockNews = results.slice(1); // [{ticker, items}]
+
+    let html = '';
+
+    // Market news section
+    if (marketNews.length > 0) {
+      html += `<div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:10px">Market News</div>
+        ${marketNews.map(item => newsCard(item)).join('')}
+      </div>`;
+    }
+
+    // Per-stock news
+    for (const { ticker, items } of stockNews) {
+      const filtered = Array.isArray(items) ? items.slice(0, 5) : [];
+      if (!filtered.length) continue;
+      html += `<div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:10px">${ticker} News</div>
+        ${filtered.map(item => newsCard(item)).join('')}
+      </div>`;
+    }
+
+    if (!html) {
+      html = `<div class="empty-state" style="padding:40px 20px">
+        <div class="icon">📰</div>
+        <h3>No news right now</h3>
+        <p>Check back later for the latest market news</p>
+      </div>`;
+    }
+
+    container.innerHTML = html;
+    const totalItems = marketNews.length + stockNews.reduce((s,x)=>s+(x.items?.length||0),0);
+    if (countEl) countEl.textContent = totalItems > 0 ? `${totalItems} articles` : '';
+
+  } catch(err) {
+    container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
+      <div class="icon">⚠️</div>
+      <h3>Could not load news</h3>
+      <p>Check your API key or try again later</p>
+    </div>`;
+  }
+}
+
+function newsCard(item) {
+  if (!item || !item.headline) return '';
+  const time = item.datetime
+    ? (() => {
+        const d = new Date(item.datetime * 1000);
+        const diffH = Math.floor((Date.now() - d) / 3600000);
+        if (diffH < 1) return 'Just now';
+        if (diffH < 24) return `${diffH}h ago`;
+        return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+      })()
+    : '';
+  const source = item.source || '';
+  const img = item.image
+    ? `<img src="${item.image}" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0;background:var(--surface2)" onerror="this.style.display='none'" loading="lazy">`
+    : '';
+
+  return `<a href="${item.url || '#'}" target="_blank" rel="noopener"
+    style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);text-decoration:none;color:inherit;margin-bottom:8px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${item.headline}</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3)">
+        ${source ? `<span style="font-weight:600">${source}</span><span>·</span>` : ''}
+        <span>${time}</span>
       </div>
     </div>
-  `).join('');
-
-  // Load or re-run Twitter widget script
-  if (window.twttr && window.twttr.widgets) {
-    window.twttr.widgets.load(container);
-  } else if (!document.getElementById('twitter-widget-script')) {
-    const script = document.createElement('script');
-    script.id  = 'twitter-widget-script';
-    script.src = 'https://platform.twitter.com/widgets.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.twttr && window.twttr.widgets) window.twttr.widgets.load(container);
-    };
-    document.head.appendChild(script);
-  }
+    ${img}
+  </a>`;
 }
 
 function addTwitterAccount() {
@@ -3439,21 +3565,20 @@ function addTwitterAccount() {
   if (!input) return;
   let handle = input.value.trim().replace(/^@/, '');
   if (!handle) return;
-  // Basic validation — alphanumeric + underscore only
   if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) {
     showToast('Invalid username — only letters, numbers, and underscores', 'error');
     return;
   }
   if (!state.settings.twitterAccounts) state.settings.twitterAccounts = [];
   if (state.settings.twitterAccounts.map(h => h.toLowerCase()).includes(handle.toLowerCase())) {
-    showToast('@' + handle + ' is already in your feed', 'error');
+    showToast('@' + handle + ' is already in your list', 'error');
     return;
   }
   state.settings.twitterAccounts.push(handle);
   save();
   input.value = '';
   renderTwitterAccountsList();
-  showToast('@' + handle + ' added to News feed', 'success');
+  showToast('@' + handle + ' added', 'success');
 }
 
 function removeTwitterAccount(handle) {
@@ -3923,17 +4048,18 @@ function saveEditTransaction() {
 }
 
 function confirmDeleteTransaction() {
+  const id = document.getElementById('edit-tx-id').value;
+  // Close the edit modal first so confirm dialog is clearly visible
+  closeModal('edit-modal-overlay');
   showConfirm('Delete Transaction', 'This cannot be undone. The transaction will be permanently removed.', 'Delete', () => {
-    const id = document.getElementById('edit-tx-id').value;
     state.transactions = state.transactions.filter(t => t.id !== id);
     save();
-    closeModal('edit-modal-overlay');
     renderHome();
     if (currentDetailTicker) renderDetail(currentDetailTicker);
     renderHistory();
     showToast('Transaction deleted', '');
 
-    // Auto-sync to Google Sheets in background
+    // Sync deletion to Google Sheets
     syncInBackground();
   }, true);
 }
