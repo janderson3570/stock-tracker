@@ -1743,49 +1743,106 @@ const STOCK_DB_DEDUP = STOCK_DB.filter(s => {
   return true;
 });
 
-// ── Ticker name lookup — uses search cache, then hardcoded DB ──
-// Cache of {ticker -> name} populated by Finnhub search results
-const _tickerNameCache = {};
+// Live listing from Alpha Vantage — populated on init, searched first in autocomplete
+// Format: [{t:'AAPL', n:'Apple Inc.', e:'NYSE'}, ...]
+let LIVE_LISTING = [];
 
+// Helper: look up company name from live listing or fallback hardcoded DB
 function tickerName(ticker) {
-  if (_tickerNameCache[ticker]) return _tickerNameCache[ticker];
+  const live = LIVE_LISTING.find(s => s.t === ticker);
+  if (live) return live.n;
   const db = STOCK_DB_DEDUP.find(s => s.t === ticker);
   return db ? db.n : ticker;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FINNHUB SYMBOL SEARCH — live as-you-type autocomplete
-// Uses /search?q= which covers all stocks, ETFs, indices in Finnhub
+// LIVE LISTING — fetch all US stocks from Alpha Vantage
+// Cached in localStorage for 7 days so we don't waste API calls
 // ═══════════════════════════════════════════════════════════════
-let _searchDebounceTimer = null;
-let _lastSearchQuery = '';
+const LISTING_CACHE_KEY = 'st_listing_cache';
+const LISTING_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-async function searchFinnhubSymbols(query) {
-  const key = state.settings.apiKey;
-  if (!key || !query) return [];
-  try {
-    const url = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${key}`;
-    const r = await fetch(url);
-    const data = await r.json();
-    if (!data.result) return [];
-    // Filter to US-listed equities and ETFs, exclude weird derivatives
-    return data.result
-      .filter(s => s.type === 'Common Stock' || s.type === 'ETP' || s.type === 'ETF' || !s.type)
-      .filter(s => s.symbol && !s.symbol.includes('.') && s.symbol.length <= 5)
-      .slice(0, 10)
-      .map(s => {
-        // Cache name for later use
-        if (s.description) _tickerNameCache[s.symbol] = s.description;
-        return { t: s.symbol, n: s.description || s.symbol };
-      });
-  } catch(e) {
-    return [];
-  }
-}
-
-// No-op — keeping for compatibility with init() call
 async function loadLiveListing() {
-  // Autocomplete now uses live Finnhub /search — no pre-loading needed
+  // Try cache first
+  try {
+    const cached = localStorage.getItem(LISTING_CACHE_KEY);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < LISTING_CACHE_TTL && data.length > 100) {
+        LIVE_LISTING = data;
+        console.log(`Loaded ${data.length} tickers from cache`);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // Fetch fresh from Alpha Vantage listing status endpoint
+  // Must go through a CORS proxy — AV's LISTING_STATUS endpoint blocks direct browser requests
+  const key = 'd6e7mt9r01qh94m3431gd6e7mt9r01qh94m34320'; // kept for AV listing only
+  const CORS_PROXIES = [
+    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://cors-anywhere.herokuapp.com/${u}`,
+  ];
+  try {
+    const avUrl = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${key}`;
+    let text = null;
+
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const res = await fetch(proxy(avUrl), { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) continue;
+        const t = await res.text();
+        // Quick sanity check — real CSV starts with "symbol," header
+        if (t.trim().startsWith('symbol,') || t.includes('symbol,name,exchange')) {
+          text = t;
+          break;
+        }
+      } catch(e) {
+        continue; // try next proxy
+      }
+    }
+    if (!text) throw new Error('All proxies failed');
+
+    // Parse CSV: symbol,name,exchange,assetType,ipoDate,delistingDate,status
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) throw new Error('Bad response');
+
+    const parsed = [];
+    for (let i = 1; i < lines.length; i++) {
+      // CSV may have quoted fields — handle simply
+      const cols = lines[i].split(',');
+      if (cols.length < 4) continue;
+      const symbol  = (cols[0] || '').trim().replace(/^"|"$/g, '');
+      const name    = (cols[1] || '').trim().replace(/^"|"$/g, '');
+      const exchange= (cols[2] || '').trim().replace(/^"|"$/g, '');
+      const type    = (cols[3] || '').trim().replace(/^"|"$/g, '');
+      const status  = (cols[6] || '').trim().replace(/^"|"$/g, '');
+
+      // Only active US-listed equities and ETFs
+      if (!symbol || !name) continue;
+      if (status && status.toLowerCase() !== 'active') continue;
+      if (!['NYSE','NASDAQ','NYSE ARCA','NYSE MKT','BATS'].includes(exchange) &&
+          !exchange.startsWith('NYSE') && !exchange.startsWith('NASDAQ')) continue;
+
+      parsed.push({ t: symbol, n: name, e: exchange, _type: type });
+    }
+
+    if (parsed.length > 100) {
+      LIVE_LISTING = parsed;
+      try {
+        localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: parsed }));
+      } catch(e) {
+        // localStorage quota — store a trimmed version (symbol+name only)
+        const slim = parsed.map(s => ({ t: s.t, n: s.n }));
+        try { localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: slim })); } catch(e2) {}
+      }
+      console.log(`Fetched ${parsed.length} live tickers for autocomplete`);
+    }
+  } catch(err) {
+    console.warn('Could not fetch live listing, using built-in database', err);
+    // Fall through — LIVE_LISTING stays empty, autocomplete uses STOCK_DB_DEDUP
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3624,12 +3681,11 @@ async function syncNow() {
 
   updateSyncStatus('syncing');
 
-  // Convert transactions to rows for sheets
   const header = ['id','ticker','type','shares','price','date','timestamp'];
-  const rows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
 
   try {
-    // First try to read from sheets — use POST to avoid redirect issues
+    // First read from sheet to find any transactions added on OTHER devices
+    // that aren't in local state yet (truly new IDs we've never seen)
     const readRes = await fetch(url, {
       method: 'POST',
       body: JSON.stringify({ action: 'read' }),
@@ -3638,29 +3694,33 @@ async function syncNow() {
     const readData = await readRes.json();
 
     if (readData.ok && readData.data && readData.data.length > 1) {
-      // Sheet has data — merge (sheet is source of truth for existing, local for new)
       const sheetTxs = readData.data.slice(1).map(r => ({
-        id: String(r[0]), ticker: r[1], type: r[2],
+        id: String(r[0]), ticker: String(r[1]||'').toUpperCase().trim(),
+        type: String(r[2]||'').toLowerCase().trim(),
         shares: parseFloat(r[3]), price: parseFloat(r[4]),
-        date: normalizeDate(r[5]),   // handle Sheets date formats
-        timestamp: parseInt(r[6])
-      })).filter(t => t.id && t.ticker);
-      
-      // Merge: keep all sheet txs + any local-only
-      const sheetIds = new Set(sheetTxs.map(t=>t.id));
-      const localOnly = state.transactions.filter(t => !sheetIds.has(t.id));
-      state.transactions = [...sheetTxs, ...localOnly];
-      state.transactions.sort((a,b) => b.timestamp - a.timestamp);
+        date: normalizeDate(r[5]), timestamp: parseInt(r[6])
+      })).filter(t => t.id && t.ticker && (t.type==='buy'||t.type==='sell') && !isNaN(t.shares) && !isNaN(t.price));
+
+      // Only bring in IDs that are genuinely new — not in local state at all.
+      // Do NOT restore IDs that we deleted locally (those are intentionally gone).
+      const localIds = new Set(state.transactions.map(t => t.id));
+      const brandNew = sheetTxs.filter(t => !localIds.has(t.id));
+      if (brandNew.length > 0) {
+        state.transactions = [...state.transactions, ...brandNew];
+        state.transactions.sort((a, b) => b.timestamp - a.timestamp);
+        save();
+      }
     }
 
-    // Write merged data back
+    // Write current local state to sheet — this is the authoritative version
+    // (includes any deletions we made locally)
     const writeRows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
     const writeRes = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({action:'write', rows: writeRows})
+      body: JSON.stringify({ action: 'write', rows: writeRows })
     });
     const writeData = await writeRes.json();
-    
+
     if (writeData.ok) {
       save();
       updateSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString());
@@ -3724,64 +3784,40 @@ function onTickerInput(val) {
   const q = val.trim().toUpperCase();
   if (!q) { list.classList.remove('show'); return; }
 
-  // Show instant local results from hardcoded DB while API call is in flight
-  const localMatches = [];
-  for (const s of STOCK_DB_DEDUP) {
+  // Search live listing first (Alpha Vantage full list), fall back to hardcoded DB
+  const searchSource = LIVE_LISTING.length > 100 ? LIVE_LISTING : STOCK_DB_DEDUP;
+
+  // Scoring: exact ticker match first, then ticker starts-with, then name contains
+  const scored = [];
+  for (const s of searchSource) {
     const t = s.t.toUpperCase();
     const n = (s.n || '').toUpperCase();
-    if (t === q)               localMatches.push({ s, score: 0 });
-    else if (t.startsWith(q)) localMatches.push({ s, score: 1 });
-    else if (n.startsWith(q)) localMatches.push({ s, score: 2 });
-    else if (t.includes(q))   localMatches.push({ s, score: 3 });
-    else if (n.includes(q))   localMatches.push({ s, score: 4 });
+    if (t === q)               scored.push({ s, score: 0 });
+    else if (t.startsWith(q)) scored.push({ s, score: 1 });
+    else if (n.startsWith(q)) scored.push({ s, score: 2 });
+    else if (t.includes(q))   scored.push({ s, score: 3 });
+    else if (n.includes(q))   scored.push({ s, score: 4 });
+    if (scored.length >= 50) break; // cap early for performance
   }
-  localMatches.sort((a, b) => a.score - b.score);
-  const localTop = localMatches.slice(0, 8).map(x => x.s);
-  renderAutocompleteItems(localTop, q, true /* loading */);
+  scored.sort((a, b) => a.score - b.score);
+  const matches = scored.slice(0, 10).map(x => x.s);
 
-  // Debounce the live API search — fire after 300ms of no typing
-  clearTimeout(_searchDebounceTimer);
-  _lastSearchQuery = q;
-  _searchDebounceTimer = setTimeout(async () => {
-    if (_lastSearchQuery !== q) return; // stale
-    const apiKey = state.settings.apiKey;
-    if (!apiKey) {
-      // No key — just show local results without loading indicator
-      renderAutocompleteItems(localTop, q, false);
-      return;
-    }
-    const results = await searchFinnhubSymbols(q);
-    if (_lastSearchQuery !== q) return; // another keystroke came in while we awaited
-    if (results.length > 0) {
-      renderAutocompleteItems(results, q, false);
-    } else {
-      // API returned nothing — fall back to local results
-      renderAutocompleteItems(localTop, q, false);
-    }
-  }, 300);
-}
-
-function renderAutocompleteItems(items, q, loading) {
-  const list = document.getElementById('autocomplete-list');
-  if (!items.length && !loading) { list.classList.remove('show'); return; }
-
-  const exactMatch = items.find(s => s.t.toUpperCase() === q);
-  const rows = [...items];
-  // If no exact match, add a "use anyway" option
+  // Show a "use anyway" option if no exact match
+  const exactMatch = matches.find(s => s.t.toUpperCase() === q);
+  const items = [...matches];
   if (!exactMatch && q.length >= 1) {
-    rows.push({ t: q, n: 'Add manually (not in search results)', _manual: true });
+    items.push({ t: q, n: LIVE_LISTING.length > 100 ? 'Not found — add manually' : 'Enter manually (loading full list…)', _manual: true });
   }
 
-  list.innerHTML = rows.map(s => {
-    const isManual = s._manual;
-    return `<div class="autocomplete-item" onclick="selectTicker('${s.t.replace(/'/g,"\\'")}')">
-      <div class="autocomplete-ticker">${s.t}</div>
-      <div class="autocomplete-name" style="${isManual ? 'color:var(--blue);font-style:italic' : ''}">${s.n || ''}</div>
-    </div>`;
-  }).join('') + (loading && state.settings.apiKey
-    ? `<div style="padding:8px 14px;font-size:11px;color:var(--text3);font-style:italic">Searching all stocks…</div>`
-    : '');
+  if (!items.length) { list.classList.remove('show'); return; }
 
+  list.innerHTML = items.map(s => {
+    const exchange = s.e ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${s.e}</span>` : '';
+    return `<div class="autocomplete-item" onclick="selectTicker('${s.t.replace(/'/g,"\\'")}')">
+      <div class="autocomplete-ticker">${s.t}${exchange}</div>
+      <div class="autocomplete-name" style="${s._manual ? 'color:var(--blue);font-style:italic' : ''}">${s.n}</div>
+    </div>`;
+  }).join('');
   list.classList.add('show');
 }
 
@@ -3987,8 +4023,9 @@ function closeConfirm() {
   confirmCallback = null;
 }
 function runConfirm() {
+  const cb = confirmCallback; // capture BEFORE closeConfirm nulls it
   closeConfirm();
-  if (confirmCallback) confirmCallback();
+  if (cb) cb();
 }
 
 // ═══════════════════════════════════════════════════════════════
