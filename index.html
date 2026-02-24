@@ -2254,64 +2254,155 @@ async function fetchCompanyProfile(ticker) {
   } catch(e) {}
 }
 
+// ── Chart data cache {cacheKey -> {points, fetchedAt, isOHLC}} ──
+const _chartCache = {};
+
+// Is the US market currently open? (ET timezone check)
+function isMarketOpen() {
+  const now = new Date();
+  // Convert to ET
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay(); // 0=Sun, 6=Sat
+  if (day === 0 || day === 6) return false;
+  const h = et.getHours(), m = et.getMinutes();
+  const mins = h * 60 + m;
+  return mins >= 570 && mins < 960; // 9:30am–4:00pm ET
+}
+
+// Get today's market open timestamp in ET (9:30am today ET, as unix seconds)
+function todayOpenET() {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  et.setHours(9, 30, 0, 0);
+  return Math.floor(et.getTime() / 1000);
+}
+
+// Get the most recent market open day (skip weekends)
+function lastMarketOpenET(daysBack = 0) {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  et.setHours(9, 30, 0, 0);
+  et.setDate(et.getDate() - daysBack);
+  // Roll back past weekends
+  while (et.getDay() === 0 || et.getDay() === 6) et.setDate(et.getDate() - 1);
+  return Math.floor(et.getTime() / 1000);
+}
+
 async function fetchHistoricalPrices(ticker, period) {
   const key = state.settings.apiKey;
-  if (!key) return generateMockChart(ticker, period);
+  if (!key) return null;
+
+  const cacheKey = `${ticker}_${period}`;
+  const cached = _chartCache[cacheKey];
+  // Cache for 5 mins (or 30 mins if market is closed)
+  const ttl = isMarketOpen() ? 5 * 60 * 1000 : 30 * 60 * 1000;
+  if (cached && (Date.now() - cached.fetchedAt) < ttl) {
+    return cached;
+  }
 
   try {
-    // Map period to days back and resolution
     const now = Math.floor(Date.now() / 1000);
-    let from, resolution;
-    if      (period === '1D') { from = now - 86400;        resolution = '60'; }
-    else if (period === '1W') { from = now - 7*86400;      resolution = 'D';  }
-    else if (period === '1M') { from = now - 30*86400;     resolution = 'D';  }
-    else if (period === '3M') { from = now - 90*86400;     resolution = 'D';  }
-    else if (period === '6M') { from = now - 180*86400;    resolution = 'D';  }
-    else if (period === '1Y') { from = now - 365*86400;    resolution = 'W';  }
-    else                      { from = now - 5*365*86400;  resolution = 'M';  }
+    let points = [];
+    let isOHLC = false;
 
-    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${now}&token=${key}`;
-    const r = await fetch(url);
-    const data = await r.json();
+    if (period === '1D') {
+      // 60-min candles from today's open (9:30am ET) to now
+      const from = todayOpenET() - 300; // 5 min buffer before open
+      const data = await finnhubCandle(ticker, '60', from, now, key);
+      if (!data) return null; // market closed or no data today
 
-    if (data.s !== 'ok' || !data.c || !data.t) return generateMockChart(ticker, period);
+      // Only keep today's candles (filter out any premarket noise)
+      const etToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const todayStr = `${etToday.getFullYear()}-${String(etToday.getMonth()+1).padStart(2,'0')}-${String(etToday.getDate()).padStart(2,'0')}`;
+      points = data.filter(p => p.date === todayStr);
+      if (points.length === 0) return null; // no trading today yet
 
-    const points = data.t.map((ts, i) => ({
-      date:  new Date(ts * 1000).toISOString().split('T')[0],
-      price: data.c[i]
-    }));
-    points.sort((a, b) => a.date.localeCompare(b.date));
-    return points;
+    } else if (period === '1W') {
+      // 60-min candles for the last 5 trading sessions
+      // Finnhub can handle ~7 calendar days reliably at 60-min resolution
+      const from = lastMarketOpenET(7); // go back 7 calendar days to get 5 trading days
+      const data = await finnhubCandle(ticker, '60', from, now, key);
+      if (!data || data.length === 0) return null;
+      // Keep only the last 5 unique trading days
+      const days = [...new Set(data.map(p => p.date))].sort().slice(-5);
+      points = data.filter(p => days.includes(p.date));
+
+    } else if (period === '1M') {
+      // Daily OHLC candles for ~22 trading days — use open+close to show intraday range
+      const from = now - 35 * 86400;
+      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      if (!data || data.length === 0) return null;
+      points = data.slice(-23); // last ~1 month of trading days
+      isOHLC = true;
+
+    } else if (period === '3M') {
+      const from = now - 100 * 86400;
+      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      if (!data || data.length === 0) return null;
+      points = data.slice(-66);
+      isOHLC = true;
+
+    } else if (period === '6M') {
+      const from = now - 200 * 86400;
+      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      if (!data || data.length === 0) return null;
+      points = data.slice(-130);
+      isOHLC = true;
+
+    } else if (period === '1Y') {
+      const from = now - 370 * 86400;
+      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      if (!data || data.length === 0) return null;
+      points = data.slice(-252);
+      isOHLC = true;
+
+    } else { // 5Y
+      const from = now - 5 * 370 * 86400;
+      const data = await finnhubCandle(ticker, 'W', from, now, key, true);
+      if (!data || data.length === 0) return null;
+      points = data.slice(-260);
+      isOHLC = true;
+    }
+
+    if (!points || points.length < 2) return null;
+
+    const result = { points, isOHLC, fetchedAt: Date.now() };
+    _chartCache[cacheKey] = result;
+    return result;
+
   } catch(e) {
-    return generateMockChart(ticker, period);
+    console.error('fetchHistoricalPrices error:', e);
+    return null;
   }
 }
 
-function generateMockChart(ticker, period) {
-  // Generate plausible mock data based on current price
-  const basePrice = state.prices[ticker]?.price || 100;
-  const days = period === '1D' ? 1 : period === '1W' ? 7 :
-               period === '1M' ? 30 : period === '3M' ? 90 :
-               period === '6M' ? 180 : period === '1Y' ? 365 : 1825;
-  const points = [];
-  let price = basePrice * (0.7 + Math.random() * 0.4);
-  const now = new Date();
-  for (let i = days; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    price *= (1 + (Math.random() - 0.48) * 0.025);
-    price = Math.max(price, 0.01);
-    points.push({ date: d.toISOString().split('T')[0], price: +price.toFixed(2) });
-  }
-  // Ensure last point matches current price
-  if (points.length) points[points.length-1].price = basePrice;
-  return points;
+// Raw Finnhub candle fetch — returns array of {date, time, price, open, high, low, close}
+async function finnhubCandle(ticker, resolution, from, to, key, includeOHLC = false) {
+  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${to}&token=${key}`;
+  const r = await fetch(url);
+  const data = await r.json();
+  if (data.s !== 'ok' || !data.c || !data.t || data.c.length === 0) return null;
+
+  return data.t.map((ts, i) => {
+    const d = new Date(ts * 1000);
+    const et = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const date = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
+    const obj = { date, time: ts, price: data.c[i] };
+    if (includeOHLC) {
+      obj.open  = data.o?.[i] ?? data.c[i];
+      obj.high  = data.h?.[i] ?? data.c[i];
+      obj.low   = data.l?.[i] ?? data.c[i];
+      obj.close = data.c[i];
+    }
+    return obj;
+  }).filter(p => p.price > 0).sort((a, b) => a.time - b.time);
 }
 
 async function refreshAllPrices() {
   const tickers = [...new Set(state.transactions.map(t => t.ticker))];
   if (!tickers.length) { showToast('No stocks to refresh', 'error'); return; }
   if (!state.settings.apiKey) { showToast('Add API key in Settings first', 'error'); return; }
+
+  // Clear chart cache so charts re-fetch after price refresh
+  Object.keys(_chartCache).forEach(k => delete _chartCache[k]);
 
   // Check if per-minute rate limit was recently hit
   if (wasRateLimitedToday()) {
@@ -3082,22 +3173,64 @@ function renderLtStBreakdown(ticker, holding) {
 async function loadChart(ticker, period, btnEl) {
   chartPeriod = period;
   if (btnEl) {
-    document.querySelectorAll('.chart-period-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.remove('active'));
     btnEl.classList.add('active');
   }
-  const data = await fetchHistoricalPrices(ticker, period);
-  chartData = data;
-  drawChart(data);
+
+  const canvas = document.getElementById('chart-canvas');
+  if (canvas) {
+    // Show loading state
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.clientWidth || 300;
+    const H = 210;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#9b9b93';
+    ctx.font = "12px 'DM Sans', sans-serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Loading…', W / 2, H / 2);
+  }
+
+  const result = await fetchHistoricalPrices(ticker, period);
+  chartData = result ? result.points : null;
+
+  if (!result || !result.points || result.points.length < 2) {
+    if (canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const W = canvas.parentElement.clientWidth || 300;
+      const H = 210;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#9b9b93';
+      ctx.font = "13px 'DM Sans', sans-serif";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (period === '1D') {
+        ctx.fillText('Market is closed — no trading today yet', W / 2, H / 2 - 8);
+        ctx.font = "11px 'DM Sans', sans-serif";
+        ctx.fillText('Switch to 1W to see recent sessions', W / 2, H / 2 + 12);
+      } else {
+        ctx.fillText('No chart data available for this period', W / 2, H / 2);
+      }
+    }
+    return;
+  }
+
+  drawChart(result.points, result.isOHLC);
 }
 
-function drawChart(data) {
+function drawChart(data, isOHLC = false) {
   const canvas = document.getElementById('chart-canvas');
-  if (!canvas || !data || !data.length) return;
+  if (!canvas || !data || data.length < 2) return;
 
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  const W = rect.width || canvas.parentElement.offsetWidth;
-  const H = 210; // taller to give room for axes
+  const W = canvas.parentElement.clientWidth || canvas.parentElement.offsetWidth || 300;
+  const H = 210;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   canvas.style.width = W + 'px';
@@ -3107,69 +3240,95 @@ function drawChart(data) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
+  // For OHLC mode use high/low for range, else use close prices
   const prices = data.map(d => d.price);
-  const rawMin = Math.min(...prices);
-  const rawMax = Math.max(...prices);
-  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
+  const allPrices = isOHLC
+    ? [...data.map(d => d.low ?? d.price), ...data.map(d => d.high ?? d.price)]
+    : prices;
 
-  // Nice Y axis: expand range by 10% top and bottom, snap to round numbers
+  const rawMin = Math.min(...allPrices);
+  const rawMax = Math.max(...allPrices);
+  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
   const niceMin = rawMin - rawRange * 0.08;
   const niceMax = rawMax + rawRange * 0.08;
   const niceRange = niceMax - niceMin;
 
-  // Padding: left wider for Y labels
-  const pad = { top: 12, right: 12, bottom: 36, left: 58 };
+  const pad = { top: 12, right: 20, bottom: 36, left: 58 };
   const cw = W - pad.left - pad.right;
   const ch = H - pad.top - pad.bottom;
 
   const toX = i => pad.left + (i / Math.max(data.length - 1, 1)) * cw;
   const toY = v => pad.top + ch - ((v - niceMin) / niceRange) * ch;
 
-  // Color
-  const isUp = prices[prices.length-1] >= prices[0];
-  const lineColor = isUp ? '#1a9e5c' : '#d63b3b';
-  const fillColor = isUp ? 'rgba(26,158,92,0.07)' : 'rgba(214,59,59,0.07)';
-  const gridColor = 'rgba(0,0,0,0.06)';
+  // Color: based on first vs last close price
+  const isUp = prices[prices.length - 1] >= prices[0];
+  const lineColor  = isUp ? '#1a9e5c' : '#d63b3b';
+  const fillColor  = isUp ? 'rgba(26,158,92,0.07)' : 'rgba(214,59,59,0.07)';
+  const upColor    = '#1a9e5c';
+  const downColor  = '#d63b3b';
+  const gridColor  = 'rgba(0,0,0,0.06)';
   const labelColor = '#9b9b93';
-  const fontSize = 10;
+  const fontSize   = 10;
 
-  // ── Y axis grid lines and labels (4 lines) ──
+  // ── Y axis ──
   ctx.font = `${fontSize}px 'DM Mono', monospace`;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  const yTicks = 4;
-  for (let i = 0; i <= yTicks; i++) {
-    const v = niceMin + (niceRange * i / yTicks);
+  for (let i = 0; i <= 4; i++) {
+    const v = niceMin + (niceRange * i / 4);
     const y = toY(v);
-    // Grid line
     ctx.beginPath();
     ctx.moveTo(pad.left, y);
     ctx.lineTo(W - pad.right, y);
     ctx.strokeStyle = gridColor;
     ctx.lineWidth = 1;
     ctx.stroke();
-    // Label
     ctx.fillStyle = labelColor;
-    const label = v >= 1000 ? '$' + (v/1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : v < 100 ? 2 : 0);
+    const label = v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : v < 100 ? 2 : 0);
     ctx.fillText(label, pad.left - 5, y);
   }
 
-  // ── X axis labels (smart date formatting based on data span) ──
+  // ── X axis labels ──
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   const xTickCount = Math.min(5, data.length);
-  const xStep = Math.floor((data.length - 1) / (xTickCount - 1)) || 1;
+  const xStep = Math.max(1, Math.floor((data.length - 1) / (xTickCount - 1)));
+
+  // For intraday (1D/1W) show time labels; for daily show date labels
+  const spanDays = [...new Set(data.map(d => d.date))].length;
+  const isIntraday = spanDays <= 5 && !isOHLC;
+
+  const drawnXPositions = [];
   for (let i = 0; i < data.length; i += xStep) {
-    if (i >= data.length) break;
-    const d = new Date(data[i].date + 'T00:00:00');
-    const spanDays = data.length;
-    let label;
-    if (spanDays <= 7)        label = d.toLocaleDateString('en-US',{weekday:'short'});
-    else if (spanDays <= 60)  label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    else if (spanDays <= 400) label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    else                      label = d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
     const x = toX(i);
-    // Tick mark
+    // Avoid overlapping labels
+    if (drawnXPositions.some(px => Math.abs(px - x) < 40)) continue;
+    drawnXPositions.push(x);
+
+    let label;
+    if (isIntraday) {
+      // Show time for intraday
+      const et = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const h = et.getHours(), m = et.getMinutes();
+      const ampm = h >= 12 ? 'pm' : 'am';
+      label = (h > 12 ? h - 12 : h || 12) + (m ? ':' + String(m).padStart(2,'0') : '') + ampm;
+      // On 1W, show day name before first candle of each day
+      if (spanDays > 1 && i > 0 && data[i].date !== data[i-1].date) {
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const et2 = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        label = dayNames[et2.getDay()];
+      } else if (i === 0) {
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const et0 = new Date(new Date(data[0].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        label = dayNames[et0.getDay()];
+      }
+    } else {
+      const d = new Date(data[i].date + 'T12:00:00Z');
+      if (spanDays <= 35)       label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      else if (spanDays <= 270) label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      else                      label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
+
     ctx.beginPath();
     ctx.moveTo(x, H - pad.bottom);
     ctx.lineTo(x, H - pad.bottom + 4);
@@ -3179,19 +3338,8 @@ function drawChart(data) {
     ctx.fillStyle = labelColor;
     ctx.fillText(label, x, H - pad.bottom + 6);
   }
-  // Also always label the last point
-  const lastIdx = data.length - 1;
-  if (lastIdx % xStep !== 0) {
-    const d = new Date(data[lastIdx].date + 'T00:00:00');
-    const spanDays = data.length;
-    let label = spanDays <= 400
-      ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
-      : d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
-    ctx.fillStyle = labelColor;
-    ctx.fillText(label, toX(lastIdx), H - pad.bottom + 6);
-  }
 
-  // ── Baseline (X axis line) ──
+  // ── Baseline ──
   ctx.beginPath();
   ctx.moveTo(pad.left, H - pad.bottom);
   ctx.lineTo(W - pad.right, H - pad.bottom);
@@ -3199,43 +3347,92 @@ function drawChart(data) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // ── Fill under line ──
-  ctx.beginPath();
-  ctx.moveTo(toX(0), toY(prices[0]));
-  for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-  ctx.lineTo(toX(data.length-1), H - pad.bottom);
-  ctx.lineTo(toX(0), H - pad.bottom);
-  ctx.closePath();
-  ctx.fillStyle = fillColor;
-  ctx.fill();
+  if (isOHLC) {
+    // ── OHLC bars for 1M+ ──
+    const barW = Math.max(1, Math.floor(cw / data.length) - 1);
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      const x = toX(i);
+      const open  = d.open  ?? d.price;
+      const close = d.close ?? d.price;
+      const high  = d.high  ?? d.price;
+      const low   = d.low   ?? d.price;
+      const color = close >= open ? upColor : downColor;
 
-  // ── Price line ──
-  ctx.beginPath();
-  ctx.moveTo(toX(0), toY(prices[0]));
-  for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = 2;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.stroke();
+      // Wick (high-low line)
+      ctx.beginPath();
+      ctx.moveTo(x, toY(high));
+      ctx.lineTo(x, toY(low));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
-  // ── Current price dot at end ──
-  const lastX = toX(data.length - 1);
-  const lastY = toY(prices[data.length - 1]);
-  ctx.beginPath();
-  ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
-  ctx.fillStyle = lineColor;
-  ctx.fill();
+      // Body (open-close bar)
+      const bodyTop = toY(Math.max(open, close));
+      const bodyBot = toY(Math.min(open, close));
+      const bodyH = Math.max(1, bodyBot - bodyTop);
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW / 2, bodyTop, barW, bodyH);
+    }
+
+  } else {
+    // ── Line chart for 1D/1W ──
+    // Day-separator vertical lines for 1W
+    if (spanDays > 1) {
+      let prevDate = data[0].date;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i].date !== prevDate) {
+          const x = toX(i);
+          ctx.beginPath();
+          ctx.moveTo(x, pad.top);
+          ctx.lineTo(x, H - pad.bottom);
+          ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          prevDate = data[i].date;
+        }
+      }
+    }
+
+    // Fill under line
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(prices[0]));
+    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+    ctx.lineTo(toX(data.length - 1), H - pad.bottom);
+    ctx.lineTo(toX(0), H - pad.bottom);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+
+    // Price line
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(prices[0]));
+    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // End dot
+    const lastX = toX(data.length - 1);
+    const lastY = toY(prices[data.length - 1]);
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
+  }
 
   // ── Touch/hover crosshair ──
-  let crosshairIdx = -1;
+  const spanDaysLocal = [...new Set(data.map(d => d.date))].length;
+  const isIntradayLocal = spanDaysLocal <= 5 && !isOHLC;
+
   function drawCrosshair(idx) {
     if (idx < 0 || idx >= data.length) return;
-    crosshairIdx = idx;
-    drawChart._baseImageData = drawChart._baseImageData; // placeholder
     const cx = toX(idx);
     const cy = toY(prices[idx]);
-    // Vertical dashed line
     ctx.save();
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
@@ -3245,18 +3442,18 @@ function drawChart(data) {
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
-    // Dot
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = lineColor;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
+    if (!isOHLC) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = lineColor;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
   }
 
-  // Save clean frame for redraw on hover
   const cleanImage = canvas.toDataURL();
 
   canvas.ontouchmove = canvas.onmousemove = (e) => {
@@ -3266,7 +3463,6 @@ function drawChart(data) {
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const x = clientX - bounds.left;
     const idx = Math.max(0, Math.min(data.length - 1, Math.round(((x - pad.left) / cw) * (data.length - 1))));
-    // Redraw from clean image then overlay crosshair
     const img = new Image();
     img.onload = () => {
       ctx.clearRect(0, 0, W, H);
@@ -3275,7 +3471,19 @@ function drawChart(data) {
     };
     img.src = cleanImage;
     const pt = data[idx];
-    showChartTooltip(`${pt.date}  ${fmt$(pt.price)}`, clientX, clientY - 36);
+    let label;
+    if (isIntradayLocal && pt.time) {
+      const et = new Date(new Date(pt.time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const h = et.getHours(), m = et.getMinutes();
+      const ampm = h >= 12 ? 'pm' : 'am';
+      const timeStr = (h > 12 ? h - 12 : h || 12) + ':' + String(m).padStart(2,'0') + ampm;
+      label = `${pt.date}  ${timeStr}  ${fmt$(pt.price)}`;
+    } else if (isOHLC && pt.open != null) {
+      label = `${pt.date}  O:${fmt$(pt.open)}  C:${fmt$(pt.close ?? pt.price)}`;
+    } else {
+      label = `${pt.date}  ${fmt$(pt.price)}`;
+    }
+    showChartTooltip(label, clientX, clientY - 36);
   };
   canvas.ontouchend = canvas.onmouseleave = () => {
     document.getElementById('chart-tooltip').style.opacity = '0';
@@ -3681,11 +3889,12 @@ async function syncNow() {
 
   updateSyncStatus('syncing');
 
+  // Convert transactions to rows for sheets
   const header = ['id','ticker','type','shares','price','date','timestamp'];
+  const rows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
 
   try {
-    // First read from sheet to find any transactions added on OTHER devices
-    // that aren't in local state yet (truly new IDs we've never seen)
+    // First try to read from sheets — use POST to avoid redirect issues
     const readRes = await fetch(url, {
       method: 'POST',
       body: JSON.stringify({ action: 'read' }),
@@ -3694,33 +3903,29 @@ async function syncNow() {
     const readData = await readRes.json();
 
     if (readData.ok && readData.data && readData.data.length > 1) {
+      // Sheet has data — merge (sheet is source of truth for existing, local for new)
       const sheetTxs = readData.data.slice(1).map(r => ({
-        id: String(r[0]), ticker: String(r[1]||'').toUpperCase().trim(),
-        type: String(r[2]||'').toLowerCase().trim(),
+        id: String(r[0]), ticker: r[1], type: r[2],
         shares: parseFloat(r[3]), price: parseFloat(r[4]),
-        date: normalizeDate(r[5]), timestamp: parseInt(r[6])
-      })).filter(t => t.id && t.ticker && (t.type==='buy'||t.type==='sell') && !isNaN(t.shares) && !isNaN(t.price));
-
-      // Only bring in IDs that are genuinely new — not in local state at all.
-      // Do NOT restore IDs that we deleted locally (those are intentionally gone).
-      const localIds = new Set(state.transactions.map(t => t.id));
-      const brandNew = sheetTxs.filter(t => !localIds.has(t.id));
-      if (brandNew.length > 0) {
-        state.transactions = [...state.transactions, ...brandNew];
-        state.transactions.sort((a, b) => b.timestamp - a.timestamp);
-        save();
-      }
+        date: normalizeDate(r[5]),   // handle Sheets date formats
+        timestamp: parseInt(r[6])
+      })).filter(t => t.id && t.ticker);
+      
+      // Merge: keep all sheet txs + any local-only
+      const sheetIds = new Set(sheetTxs.map(t=>t.id));
+      const localOnly = state.transactions.filter(t => !sheetIds.has(t.id));
+      state.transactions = [...sheetTxs, ...localOnly];
+      state.transactions.sort((a,b) => b.timestamp - a.timestamp);
     }
 
-    // Write current local state to sheet — this is the authoritative version
-    // (includes any deletions we made locally)
+    // Write merged data back
     const writeRows = [header, ...state.transactions.map(t => [t.id,t.ticker,t.type,t.shares,t.price,t.date,t.timestamp])];
     const writeRes = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({ action: 'write', rows: writeRows })
+      body: JSON.stringify({action:'write', rows: writeRows})
     });
     const writeData = await writeRes.json();
-
+    
     if (writeData.ok) {
       save();
       updateSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString());
@@ -4023,9 +4228,8 @@ function closeConfirm() {
   confirmCallback = null;
 }
 function runConfirm() {
-  const cb = confirmCallback; // capture BEFORE closeConfirm nulls it
   closeConfirm();
-  if (cb) cb();
+  if (confirmCallback) confirmCallback();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4076,7 +4280,8 @@ function init() {
   // Redraw chart on resize
   window.addEventListener('resize', () => {
     if (chartData && document.getElementById('screen-detail').classList.contains('active')) {
-      drawChart(chartData);
+      const cached = _chartCache[`${currentDetailTicker}_${chartPeriod}`];
+      drawChart(chartData, cached?.isOHLC ?? false);
     }
   });
 
