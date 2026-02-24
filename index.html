@@ -603,13 +603,32 @@
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
     margin: 0 16px 16px;
-    padding: 16px 0 10px;
+    padding: 12px 0 8px;
     overflow: hidden;
+  }
+  .chart-header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 14px 4px;
+  }
+  .chart-price-big {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+    transition: color 0.15s;
+  }
+  .chart-change-label {
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--mono);
+    transition: color 0.15s;
   }
   .chart-period-bar {
     display: flex;
     gap: 2px;
-    padding: 0 12px 12px;
+    padding: 0 10px 10px;
     overflow-x: auto;
   }
   .chart-period-btn {
@@ -631,23 +650,194 @@
   }
   #chart-canvas {
     width: 100%;
-    height: 160px;
+    height: 180px;
     display: block;
   }
   .chart-tooltip {
-    position: absolute;
-    background: var(--text);
+    position: fixed;
+    background: rgba(20,20,28,0.92);
     color: white;
     font-size: 11px;
     font-family: var(--mono);
-    padding: 5px 8px;
+    padding: 6px 10px;
     border-radius: 6px;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.1s;
     white-space: nowrap;
-    z-index: 50;
+    z-index: 999;
+    backdrop-filter: blur(4px);
   }
+
+  /* ── NEWS CARDS ── */
+  .news-article-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .news-article-inner {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .news-thumb {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+  .news-body { flex: 1; min-width: 0; }
+  .news-headline {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .news-meta {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 5px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .news-source-badge {
+    background: var(--surface2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-weight: 600;
+    font-size: 10px;
+    color: var(--text2);
+  }
+  .news-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text3);
+    padding: 18px 16px 8px;
+  }
+  .news-section-title:first-child { padding-top: 8px; }
+
+  /* ── METRIC GRID (news tab) ── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 16px 4px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .metric-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text3);
+    margin-bottom: 4px;
+  }
+  .metric-val {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+  .metric-sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* ── ANALYST ROW ── */
+  .analyst-bar-wrap {
+    margin: 0 16px 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .analyst-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .analyst-bar-label { font-size: 12px; color: var(--text2); width: 80px; flex-shrink: 0; }
+  .analyst-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .analyst-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+  .analyst-bar-count { font-size: 12px; font-family: var(--mono); color: var(--text2); width: 22px; text-align: right; flex-shrink: 0; }
+
+  /* ── EARNINGS TABLE ── */
+  .earnings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .earnings-table th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text3); padding: 0 8px 8px; text-align: right; }
+  .earnings-table th:first-child { text-align: left; }
+  .earnings-table td { padding: 8px; border-top: 1px solid var(--border); text-align: right; font-family: var(--mono); }
+  .earnings-table td:first-child { text-align: left; font-family: var(--font); color: var(--text2); }
+  .earnings-table .beat { color: var(--green); }
+  .earnings-table .miss { color: var(--red); }
+
+  /* ── INSIDER TABLE ── */
+  .insider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .insider-row:last-child { border-bottom: none; }
+  .insider-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .insider-dot.buy { background: var(--green); }
+  .insider-dot.sell { background: var(--red); }
+  .insider-name { font-size: 13px; font-weight: 500; flex: 1; }
+  .insider-detail { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  /* ── CALENDAR ITEM ── */
+  .calendar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .calendar-item:last-child { border-bottom: none; }
+  .cal-date-box {
+    width: 44px;
+    text-align: center;
+    flex-shrink: 0;
+    background: var(--accent);
+    border-radius: 6px;
+    padding: 5px 4px;
+    color: white;
+  }
+  .cal-date-mon { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cal-date-day { font-size: 18px; font-weight: 700; line-height: 1.1; }
+  .cal-info { flex: 1; }
+  .cal-title { font-size: 13px; font-weight: 600; }
+  .cal-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
 
   /* ── TRANSACTIONS ── */
   .transaction-list {
@@ -1085,13 +1275,23 @@
       <div class="stock-detail-header" id="detail-header"></div>
       <div class="kpi-grid" style="padding:0 16px;margin-bottom:16px" id="detail-kpis"></div>
       <div class="chart-wrap" id="detail-chart-wrap">
-        <div class="chart-period-bar" id="chart-periods"></div>
+        <div class="chart-header-row">
+          <div>
+            <div class="chart-price-big" id="chart-hover-price">—</div>
+            <div class="chart-change-label" id="chart-hover-change"></div>
+          </div>
+          <div class="chart-period-bar" id="chart-periods" style="padding:0;margin:0;flex:0 0 auto"></div>
+        </div>
         <canvas id="chart-canvas"></canvas>
       </div>
       <p class="section-label">Stock Details</p>
       <div class="detail-info-card" id="detail-info-card"></div>
       <p class="section-label mt16">Purchase History</p>
       <div class="transaction-list" id="detail-tx-list"></div>
+      <p class="section-label mt16">Recent News</p>
+      <div id="detail-stock-news" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">
+        <div style="color:var(--text3);font-size:13px;padding:12px 0">Loading news…</div>
+      </div>
     </div>
 
     <!-- HISTORY SCREEN -->
@@ -1261,11 +1461,11 @@
     <div class="screen" id="screen-news">
       <div class="page-content">
         <div class="section-header">
-          <div class="section-title">News Feed</div>
-          <div id="news-account-count" style="font-size:12px;color:var(--text3)"></div>
+          <div class="section-title">Market Intelligence</div>
+          <button onclick="refreshNewsTab()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">Refresh</button>
         </div>
       </div>
-      <div id="news-feeds-container" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:20px"></div>
+      <div id="news-tab-container"></div>
     </div>
 
   </div><!-- end screen-container -->
@@ -2254,36 +2454,47 @@ async function fetchCompanyProfile(ticker) {
   } catch(e) {}
 }
 
-// ── Chart data cache {cacheKey -> {points, fetchedAt, isOHLC}} ──
+// ── Chart cache: key → {points, isOHLC, openPrice, fetchedAt} ──────────────
 const _chartCache = {};
 
-// Is the US market currently open? (ET timezone check)
 function isMarketOpen() {
-  const now = new Date();
-  // Convert to ET
-  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay(); // 0=Sun, 6=Sat
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
   if (day === 0 || day === 6) return false;
-  const h = et.getHours(), m = et.getMinutes();
-  const mins = h * 60 + m;
-  return mins >= 570 && mins < 960; // 9:30am–4:00pm ET
+  const mins = et.getHours() * 60 + et.getMinutes();
+  return mins >= 570 && mins < 960;
 }
 
-// Get today's market open timestamp in ET (9:30am today ET, as unix seconds)
-function todayOpenET() {
+function todayOpenETUnix() {
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   et.setHours(9, 30, 0, 0);
   return Math.floor(et.getTime() / 1000);
 }
 
-// Get the most recent market open day (skip weekends)
-function lastMarketOpenET(daysBack = 0) {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  et.setHours(9, 30, 0, 0);
-  et.setDate(et.getDate() - daysBack);
-  // Roll back past weekends
-  while (et.getDay() === 0 || et.getDay() === 6) et.setDate(et.getDate() - 1);
-  return Math.floor(et.getTime() / 1000);
+function calendarDaysBackUnix(n) {
+  return Math.floor(Date.now() / 1000) - n * 86400;
+}
+
+// Raw Finnhub candle fetch → array of points or null
+async function finnhubCandle(ticker, resolution, from, to, key, includeOHLC) {
+  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${to}&token=${key}`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const data = await r.json();
+  if (data.s !== 'ok' || !data.c || data.c.length === 0) return null;
+
+  return data.t.map((ts, i) => {
+    const et = new Date(new Date(ts * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const date = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
+    const pt = { date, time: ts, price: data.c[i] };
+    if (includeOHLC) {
+      pt.open  = data.o?.[i] ?? data.c[i];
+      pt.high  = data.h?.[i] ?? data.c[i];
+      pt.low   = data.l?.[i] ?? data.c[i];
+      pt.close = data.c[i];
+    }
+    return pt;
+  }).filter(p => p.price > 0).sort((a, b) => a.time - b.time);
 }
 
 async function fetchHistoricalPrices(ticker, period) {
@@ -2292,108 +2503,361 @@ async function fetchHistoricalPrices(ticker, period) {
 
   const cacheKey = `${ticker}_${period}`;
   const cached = _chartCache[cacheKey];
-  // Cache for 5 mins (or 30 mins if market is closed)
   const ttl = isMarketOpen() ? 5 * 60 * 1000 : 30 * 60 * 1000;
-  if (cached && (Date.now() - cached.fetchedAt) < ttl) {
-    return cached;
-  }
+  if (cached && (Date.now() - cached.fetchedAt) < ttl) return cached;
+
+  const now = Math.floor(Date.now() / 1000);
 
   try {
-    const now = Math.floor(Date.now() / 1000);
-    let points = [];
-    let isOHLC = false;
+    let points, isOHLC = false, openPrice = null;
 
     if (period === '1D') {
-      // 60-min candles from today's open (9:30am ET) to now
-      const from = todayOpenET() - 300; // 5 min buffer before open
-      const data = await finnhubCandle(ticker, '60', from, now, key);
-      if (!data) return null; // market closed or no data today
-
-      // Only keep today's candles (filter out any premarket noise)
-      const etToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const todayStr = `${etToday.getFullYear()}-${String(etToday.getMonth()+1).padStart(2,'0')}-${String(etToday.getDate()).padStart(2,'0')}`;
+      // 60-min candles from today's 9:30am ET open
+      const from = todayOpenETUnix() - 300;
+      const data = await finnhubCandle(ticker, '60', from, now, key, false);
+      if (!data || data.length === 0) return null;
+      // Determine today's date string in ET
+      const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const todayStr = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
       points = data.filter(p => p.date === todayStr);
-      if (points.length === 0) return null; // no trading today yet
+      if (points.length === 0) return null;
+      openPrice = points[0].price;
 
     } else if (period === '1W') {
-      // 60-min candles for the last 5 trading sessions
-      // Finnhub can handle ~7 calendar days reliably at 60-min resolution
-      const from = lastMarketOpenET(7); // go back 7 calendar days to get 5 trading days
-      const data = await finnhubCandle(ticker, '60', from, now, key);
+      // 60-min candles; go back 10 calendar days to ensure 5 trading days
+      const from = calendarDaysBackUnix(10);
+      const data = await finnhubCandle(ticker, '60', from, now, key, false);
       if (!data || data.length === 0) return null;
-      // Keep only the last 5 unique trading days
+      // Keep last 5 trading days
       const days = [...new Set(data.map(p => p.date))].sort().slice(-5);
       points = data.filter(p => days.includes(p.date));
+      if (points.length === 0) return null;
+      openPrice = points[0].price;
 
     } else if (period === '1M') {
-      // Daily OHLC candles for ~22 trading days — use open+close to show intraday range
-      const from = now - 35 * 86400;
-      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(38), now, key, true);
       if (!data || data.length === 0) return null;
-      points = data.slice(-23); // last ~1 month of trading days
-      isOHLC = true;
+      points = data.slice(-23); isOHLC = true;
+      openPrice = points[0].open ?? points[0].price;
 
     } else if (period === '3M') {
-      const from = now - 100 * 86400;
-      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(100), now, key, true);
       if (!data || data.length === 0) return null;
-      points = data.slice(-66);
-      isOHLC = true;
+      points = data.slice(-66); isOHLC = true;
+      openPrice = points[0].open ?? points[0].price;
 
     } else if (period === '6M') {
-      const from = now - 200 * 86400;
-      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(200), now, key, true);
       if (!data || data.length === 0) return null;
-      points = data.slice(-130);
-      isOHLC = true;
+      points = data.slice(-130); isOHLC = true;
+      openPrice = points[0].open ?? points[0].price;
 
     } else if (period === '1Y') {
-      const from = now - 370 * 86400;
-      const data = await finnhubCandle(ticker, 'D', from, now, key, true);
+      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(375), now, key, true);
       if (!data || data.length === 0) return null;
-      points = data.slice(-252);
-      isOHLC = true;
+      points = data.slice(-252); isOHLC = true;
+      openPrice = points[0].open ?? points[0].price;
 
     } else { // 5Y
-      const from = now - 5 * 370 * 86400;
-      const data = await finnhubCandle(ticker, 'W', from, now, key, true);
+      const data = await finnhubCandle(ticker, 'W', calendarDaysBackUnix(1900), now, key, true);
       if (!data || data.length === 0) return null;
-      points = data.slice(-260);
-      isOHLC = true;
+      points = data.slice(-260); isOHLC = true;
+      openPrice = points[0].open ?? points[0].price;
     }
 
     if (!points || points.length < 2) return null;
-
-    const result = { points, isOHLC, fetchedAt: Date.now() };
+    const result = { points, isOHLC, openPrice, fetchedAt: Date.now() };
     _chartCache[cacheKey] = result;
     return result;
-
   } catch(e) {
-    console.error('fetchHistoricalPrices error:', e);
+    console.error('fetchHistoricalPrices', e);
     return null;
   }
 }
 
-// Raw Finnhub candle fetch — returns array of {date, time, price, open, high, low, close}
-async function finnhubCandle(ticker, resolution, from, to, key, includeOHLC = false) {
-  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${to}&token=${key}`;
-  const r = await fetch(url);
-  const data = await r.json();
-  if (data.s !== 'ok' || !data.c || !data.t || data.c.length === 0) return null;
+async function loadChart(ticker, period, btnEl) {
+  chartPeriod = period;
+  // Update active button
+  document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  else {
+    const btns = document.querySelectorAll('.chart-period-btn');
+    btns.forEach(b => { if (b.textContent === period) b.classList.add('active'); });
+  }
 
-  return data.t.map((ts, i) => {
-    const d = new Date(ts * 1000);
-    const et = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const date = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
-    const obj = { date, time: ts, price: data.c[i] };
-    if (includeOHLC) {
-      obj.open  = data.o?.[i] ?? data.c[i];
-      obj.high  = data.h?.[i] ?? data.c[i];
-      obj.low   = data.l?.[i] ?? data.c[i];
-      obj.close = data.c[i];
+  // Reset header
+  const hoverPrice = document.getElementById('chart-hover-price');
+  const hoverChange = document.getElementById('chart-hover-change');
+  const currentPrice = state.prices[ticker]?.price;
+  if (hoverPrice) hoverPrice.textContent = currentPrice ? fmt$(currentPrice) : '—';
+  if (hoverChange) { hoverChange.textContent = ''; hoverChange.className = 'chart-change-label'; }
+
+  // Show loading state on canvas
+  const canvas = document.getElementById('chart-canvas');
+  if (canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.clientWidth || 300;
+    const H = 180;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#9b9b93';
+    ctx.font = "12px 'DM Sans', sans-serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Loading…', W / 2, H / 2);
+  }
+
+  const result = await fetchHistoricalPrices(ticker, period);
+  chartData = result ? result.points : null;
+
+  if (!result || !result.points || result.points.length < 2) {
+    if (canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const W = canvas.parentElement.clientWidth || 300;
+      const H = 180;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#9b9b93';
+      ctx.font = "13px 'DM Sans', sans-serif";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (period === '1D') {
+        ctx.fillText('No trading data today yet', W / 2, H / 2 - 9);
+        ctx.font = "11px 'DM Sans', sans-serif";
+        ctx.fillText('Market may be closed · try 1W', W / 2, H / 2 + 11);
+      } else {
+        ctx.fillText('No data available', W / 2, H / 2);
+      }
+      if (hoverPrice) hoverPrice.textContent = currentPrice ? fmt$(currentPrice) : '—';
     }
-    return obj;
-  }).filter(p => p.price > 0).sort((a, b) => a.time - b.time);
+    return;
+  }
+
+  drawChart(result.points, result.isOHLC, result.openPrice);
+}
+
+function drawChart(data, isOHLC, openPrice) {
+  const canvas = document.getElementById('chart-canvas');
+  if (!canvas || !data || data.length < 2) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth || 320;
+  const H = 180;
+  canvas.width  = W * dpr; canvas.height  = H * dpr;
+  canvas.style.width  = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const prices = data.map(d => d.price);
+  const allPrices = isOHLC
+    ? [...data.map(d => d.low ?? d.price), ...data.map(d => d.high ?? d.price)]
+    : prices;
+
+  const rawMin = Math.min(...allPrices);
+  const rawMax = Math.max(...allPrices);
+  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
+  const niceMin = rawMin - rawRange * 0.1;
+  const niceMax = rawMax + rawRange * 0.1;
+  const niceRange = niceMax - niceMin;
+
+  const pad = { top: 8, right: 16, bottom: 32, left: 56 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const toX = i => pad.left + (i / Math.max(data.length - 1, 1)) * cw;
+  const toY = v => pad.top + ch - ((v - niceMin) / niceRange) * ch;
+
+  // Color: up = green, down = red relative to open price (or first point)
+  const ref = openPrice ?? prices[0];
+  const lastPrice = prices[prices.length - 1];
+  const isUp = lastPrice >= ref;
+  const lineColor = isUp ? '#1a9e5c' : '#d63b3b';
+  const upColor   = '#1a9e5c';
+  const downColor = '#d63b3b';
+  const gridColor = 'rgba(0,0,0,0.05)';
+  const labelColor = '#a0a09a';
+
+  // Update hover header
+  const hoverPrice = document.getElementById('chart-hover-price');
+  const hoverChange = document.getElementById('chart-hover-change');
+  if (hoverPrice) hoverPrice.textContent = fmt$(lastPrice);
+  if (hoverChange && ref > 0) {
+    const chg = lastPrice - ref;
+    const chgPct = (chg / ref) * 100;
+    hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
+    hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
+  }
+
+  // ── Y axis grid & labels ──
+  ctx.font = `10px 'DM Mono', monospace`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 4; i++) {
+    const v = niceMin + (niceRange * i / 4);
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(pad.left - 2, y); ctx.lineTo(W - pad.right, y);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = labelColor;
+    const lbl = v >= 1000 ? '$' + (v/1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : 0);
+    ctx.fillText(lbl, pad.left - 5, y);
+  }
+
+  // ── Baseline ──
+  ctx.beginPath(); ctx.moveTo(pad.left, H - pad.bottom); ctx.lineTo(W - pad.right, H - pad.bottom);
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
+
+  // ── X axis labels ──
+  const spanDays = [...new Set(data.map(d => d.date))].length;
+  const isIntraday = spanDays <= 5 && !isOHLC;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const xTickCount = Math.min(5, data.length);
+  const xStep = Math.max(1, Math.floor((data.length - 1) / (xTickCount - 1)));
+  const drawnX = [];
+  for (let i = 0; i < data.length; i += xStep) {
+    const x = toX(i);
+    if (drawnX.some(px => Math.abs(px - x) < 38)) continue;
+    drawnX.push(x);
+    let lbl;
+    if (isIntraday && data[i].time) {
+      const et = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      // Show day name at start of each day in 1W mode
+      if (spanDays > 1 && (i === 0 || (i > 0 && data[i].date !== data[i-1].date))) {
+        lbl = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][et.getDay()];
+      } else {
+        const h = et.getHours(), m = et.getMinutes();
+        lbl = (h > 12 ? h-12 : h||12) + (m ? ':'+String(m).padStart(2,'0') : '') + (h>=12?'p':'a');
+      }
+    } else {
+      const d = new Date(data[i].date + 'T12:00:00Z');
+      lbl = spanDays <= 270
+        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
+    ctx.fillStyle = labelColor;
+    ctx.fillText(lbl, x, H - pad.bottom + 5);
+  }
+
+  // ── Open/baseline reference line ──
+  if (ref > 0 && ref > niceMin && ref < niceMax) {
+    const ry = toY(ref);
+    ctx.save();
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(W - pad.right, ry);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+
+  if (isOHLC) {
+    // ── OHLC candlestick bars ──
+    const totalBars = data.length;
+    const barSlot = cw / totalBars;
+    const barW = Math.max(1.5, Math.min(barSlot * 0.65, 10));
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      const x = toX(i);
+      const open  = d.open  ?? d.price;
+      const close = d.close ?? d.price;
+      const high  = d.high  ?? d.price;
+      const low   = d.low   ?? d.price;
+      const color = close >= open ? upColor : downColor;
+      // Wick
+      ctx.beginPath(); ctx.moveTo(x, toY(high)); ctx.lineTo(x, toY(low));
+      ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+      // Body
+      const bTop = toY(Math.max(open, close));
+      const bBot = toY(Math.min(open, close));
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW / 2, bTop, barW, Math.max(1, bBot - bTop));
+    }
+
+  } else {
+    // ── Line chart ──
+    // Day separators on 1W
+    if (spanDays > 1) {
+      let prev = data[0].date;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i].date !== prev) {
+          ctx.save(); ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(toX(i), pad.top); ctx.lineTo(toX(i), H - pad.bottom);
+          ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1; ctx.stroke();
+          ctx.restore();
+          prev = data[i].date;
+        }
+      }
+    }
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+    grad.addColorStop(0, isUp ? 'rgba(26,158,92,0.13)' : 'rgba(214,59,59,0.13)');
+    grad.addColorStop(1, isUp ? 'rgba(26,158,92,0.01)' : 'rgba(214,59,59,0.01)');
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(prices[0]));
+    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+    ctx.lineTo(toX(data.length-1), H - pad.bottom);
+    ctx.lineTo(toX(0), H - pad.bottom);
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(prices[0]));
+    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
+    ctx.strokeStyle = lineColor; ctx.lineWidth = 2;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    // End dot
+    ctx.beginPath(); ctx.arc(toX(data.length-1), toY(lastPrice), 3.5, 0, Math.PI*2);
+    ctx.fillStyle = lineColor; ctx.fill();
+  }
+
+  // ── Hover / touch crosshair ──
+  const cleanImg = canvas.toDataURL();
+
+  function drawCrosshair(idx) {
+    const x = toX(idx);
+    const pt = data[idx];
+    const p0 = pt.price;
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom);
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+    if (!isOHLC) {
+      ctx.beginPath(); ctx.arc(x, toY(p0), 5, 0, Math.PI*2);
+      ctx.fillStyle = lineColor; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, toY(p0), 3, 0, Math.PI*2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+    }
+    // Update header display
+    if (hoverPrice) hoverPrice.textContent = fmt$(p0);
+    if (hoverChange && ref > 0) {
+      const chg = p0 - ref;
+      const chgPct = (chg / ref) * 100;
+      hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
+      hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
+    }
+  }
+
+  canvas.ontouchmove = canvas.onmousemove = (e) => {
+    e.preventDefault();
+    const bounds = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const x = clientX - bounds.left;
+    const idx = Math.max(0, Math.min(data.length-1, Math.round(((x - pad.left) / cw) * (data.length-1))));
+    const img = new Image();
+    img.onload = () => { ctx.clearRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H); drawCrosshair(idx); };
+    img.src = cleanImg;
+  };
+  canvas.ontouchend = canvas.onmouseleave = () => {
+    // Restore to current price on leave
+    if (hoverPrice) hoverPrice.textContent = fmt$(lastPrice);
+    if (hoverChange && ref > 0) {
+      const chg = lastPrice - ref;
+      const chgPct = (chg / ref) * 100;
+      hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
+      hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
+    }
+  };
 }
 
 async function refreshAllPrices() {
@@ -2401,7 +2865,7 @@ async function refreshAllPrices() {
   if (!tickers.length) { showToast('No stocks to refresh', 'error'); return; }
   if (!state.settings.apiKey) { showToast('Add API key in Settings first', 'error'); return; }
 
-  // Clear chart cache so charts re-fetch after price refresh
+  // Clear chart cache so charts fetch fresh data
   Object.keys(_chartCache).forEach(k => delete _chartCache[k]);
 
   // Check if per-minute rate limit was recently hit
@@ -2995,6 +3459,9 @@ async function renderDetail(ticker) {
 
   // Transactions for this ticker
   renderDetailTransactions(ticker);
+
+  // Stock news section (async, non-blocking)
+  renderStockNews(ticker);
 }
 
 function renderLtStBreakdown(ticker, holding) {
@@ -3170,334 +3637,6 @@ function renderLtStBreakdown(ticker, holding) {
   }
 }
 
-async function loadChart(ticker, period, btnEl) {
-  chartPeriod = period;
-  if (btnEl) {
-    document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.remove('active'));
-    btnEl.classList.add('active');
-  }
-
-  const canvas = document.getElementById('chart-canvas');
-  if (canvas) {
-    // Show loading state
-    const dpr = window.devicePixelRatio || 1;
-    const W = canvas.parentElement.clientWidth || 300;
-    const H = 210;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#9b9b93';
-    ctx.font = "12px 'DM Sans', sans-serif";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Loading…', W / 2, H / 2);
-  }
-
-  const result = await fetchHistoricalPrices(ticker, period);
-  chartData = result ? result.points : null;
-
-  if (!result || !result.points || result.points.length < 2) {
-    if (canvas) {
-      const dpr = window.devicePixelRatio || 1;
-      const W = canvas.parentElement.clientWidth || 300;
-      const H = 210;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-      const ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#9b9b93';
-      ctx.font = "13px 'DM Sans', sans-serif";
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (period === '1D') {
-        ctx.fillText('Market is closed — no trading today yet', W / 2, H / 2 - 8);
-        ctx.font = "11px 'DM Sans', sans-serif";
-        ctx.fillText('Switch to 1W to see recent sessions', W / 2, H / 2 + 12);
-      } else {
-        ctx.fillText('No chart data available for this period', W / 2, H / 2);
-      }
-    }
-    return;
-  }
-
-  drawChart(result.points, result.isOHLC);
-}
-
-function drawChart(data, isOHLC = false) {
-  const canvas = document.getElementById('chart-canvas');
-  if (!canvas || !data || data.length < 2) return;
-
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.parentElement.clientWidth || canvas.parentElement.offsetWidth || 300;
-  const H = 210;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, W, H);
-
-  // For OHLC mode use high/low for range, else use close prices
-  const prices = data.map(d => d.price);
-  const allPrices = isOHLC
-    ? [...data.map(d => d.low ?? d.price), ...data.map(d => d.high ?? d.price)]
-    : prices;
-
-  const rawMin = Math.min(...allPrices);
-  const rawMax = Math.max(...allPrices);
-  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
-  const niceMin = rawMin - rawRange * 0.08;
-  const niceMax = rawMax + rawRange * 0.08;
-  const niceRange = niceMax - niceMin;
-
-  const pad = { top: 12, right: 20, bottom: 36, left: 58 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-
-  const toX = i => pad.left + (i / Math.max(data.length - 1, 1)) * cw;
-  const toY = v => pad.top + ch - ((v - niceMin) / niceRange) * ch;
-
-  // Color: based on first vs last close price
-  const isUp = prices[prices.length - 1] >= prices[0];
-  const lineColor  = isUp ? '#1a9e5c' : '#d63b3b';
-  const fillColor  = isUp ? 'rgba(26,158,92,0.07)' : 'rgba(214,59,59,0.07)';
-  const upColor    = '#1a9e5c';
-  const downColor  = '#d63b3b';
-  const gridColor  = 'rgba(0,0,0,0.06)';
-  const labelColor = '#9b9b93';
-  const fontSize   = 10;
-
-  // ── Y axis ──
-  ctx.font = `${fontSize}px 'DM Mono', monospace`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i <= 4; i++) {
-    const v = niceMin + (niceRange * i / 4);
-    const y = toY(v);
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(W - pad.right, y);
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = labelColor;
-    const label = v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : v < 100 ? 2 : 0);
-    ctx.fillText(label, pad.left - 5, y);
-  }
-
-  // ── X axis labels ──
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  const xTickCount = Math.min(5, data.length);
-  const xStep = Math.max(1, Math.floor((data.length - 1) / (xTickCount - 1)));
-
-  // For intraday (1D/1W) show time labels; for daily show date labels
-  const spanDays = [...new Set(data.map(d => d.date))].length;
-  const isIntraday = spanDays <= 5 && !isOHLC;
-
-  const drawnXPositions = [];
-  for (let i = 0; i < data.length; i += xStep) {
-    const x = toX(i);
-    // Avoid overlapping labels
-    if (drawnXPositions.some(px => Math.abs(px - x) < 40)) continue;
-    drawnXPositions.push(x);
-
-    let label;
-    if (isIntraday) {
-      // Show time for intraday
-      const et = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const h = et.getHours(), m = et.getMinutes();
-      const ampm = h >= 12 ? 'pm' : 'am';
-      label = (h > 12 ? h - 12 : h || 12) + (m ? ':' + String(m).padStart(2,'0') : '') + ampm;
-      // On 1W, show day name before first candle of each day
-      if (spanDays > 1 && i > 0 && data[i].date !== data[i-1].date) {
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const et2 = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-        label = dayNames[et2.getDay()];
-      } else if (i === 0) {
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const et0 = new Date(new Date(data[0].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-        label = dayNames[et0.getDay()];
-      }
-    } else {
-      const d = new Date(data[i].date + 'T12:00:00Z');
-      if (spanDays <= 35)       label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      else if (spanDays <= 270) label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      else                      label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(x, H - pad.bottom);
-    ctx.lineTo(x, H - pad.bottom + 4);
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = labelColor;
-    ctx.fillText(label, x, H - pad.bottom + 6);
-  }
-
-  // ── Baseline ──
-  ctx.beginPath();
-  ctx.moveTo(pad.left, H - pad.bottom);
-  ctx.lineTo(W - pad.right, H - pad.bottom);
-  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  if (isOHLC) {
-    // ── OHLC bars for 1M+ ──
-    const barW = Math.max(1, Math.floor(cw / data.length) - 1);
-    for (let i = 0; i < data.length; i++) {
-      const d = data[i];
-      const x = toX(i);
-      const open  = d.open  ?? d.price;
-      const close = d.close ?? d.price;
-      const high  = d.high  ?? d.price;
-      const low   = d.low   ?? d.price;
-      const color = close >= open ? upColor : downColor;
-
-      // Wick (high-low line)
-      ctx.beginPath();
-      ctx.moveTo(x, toY(high));
-      ctx.lineTo(x, toY(low));
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Body (open-close bar)
-      const bodyTop = toY(Math.max(open, close));
-      const bodyBot = toY(Math.min(open, close));
-      const bodyH = Math.max(1, bodyBot - bodyTop);
-      ctx.fillStyle = color;
-      ctx.fillRect(x - barW / 2, bodyTop, barW, bodyH);
-    }
-
-  } else {
-    // ── Line chart for 1D/1W ──
-    // Day-separator vertical lines for 1W
-    if (spanDays > 1) {
-      let prevDate = data[0].date;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i].date !== prevDate) {
-          const x = toX(i);
-          ctx.beginPath();
-          ctx.moveTo(x, pad.top);
-          ctx.lineTo(x, H - pad.bottom);
-          ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([3, 3]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          prevDate = data[i].date;
-        }
-      }
-    }
-
-    // Fill under line
-    ctx.beginPath();
-    ctx.moveTo(toX(0), toY(prices[0]));
-    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-    ctx.lineTo(toX(data.length - 1), H - pad.bottom);
-    ctx.lineTo(toX(0), H - pad.bottom);
-    ctx.closePath();
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-
-    // Price line
-    ctx.beginPath();
-    ctx.moveTo(toX(0), toY(prices[0]));
-    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    // End dot
-    const lastX = toX(data.length - 1);
-    const lastY = toY(prices[data.length - 1]);
-    ctx.beginPath();
-    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
-    ctx.fillStyle = lineColor;
-    ctx.fill();
-  }
-
-  // ── Touch/hover crosshair ──
-  const spanDaysLocal = [...new Set(data.map(d => d.date))].length;
-  const isIntradayLocal = spanDaysLocal <= 5 && !isOHLC;
-
-  function drawCrosshair(idx) {
-    if (idx < 0 || idx >= data.length) return;
-    const cx = toX(idx);
-    const cy = toY(prices[idx]);
-    ctx.save();
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(cx, pad.top);
-    ctx.lineTo(cx, H - pad.bottom);
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-    if (!isOHLC) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-      ctx.fillStyle = lineColor;
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
-      ctx.fill();
-    }
-  }
-
-  const cleanImage = canvas.toDataURL();
-
-  canvas.ontouchmove = canvas.onmousemove = (e) => {
-    e.preventDefault();
-    const bounds = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = clientX - bounds.left;
-    const idx = Math.max(0, Math.min(data.length - 1, Math.round(((x - pad.left) / cw) * (data.length - 1))));
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(img, 0, 0, W, H);
-      drawCrosshair(idx);
-    };
-    img.src = cleanImage;
-    const pt = data[idx];
-    let label;
-    if (isIntradayLocal && pt.time) {
-      const et = new Date(new Date(pt.time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const h = et.getHours(), m = et.getMinutes();
-      const ampm = h >= 12 ? 'pm' : 'am';
-      const timeStr = (h > 12 ? h - 12 : h || 12) + ':' + String(m).padStart(2,'0') + ampm;
-      label = `${pt.date}  ${timeStr}  ${fmt$(pt.price)}`;
-    } else if (isOHLC && pt.open != null) {
-      label = `${pt.date}  O:${fmt$(pt.open)}  C:${fmt$(pt.close ?? pt.price)}`;
-    } else {
-      label = `${pt.date}  ${fmt$(pt.price)}`;
-    }
-    showChartTooltip(label, clientX, clientY - 36);
-  };
-  canvas.ontouchend = canvas.onmouseleave = () => {
-    document.getElementById('chart-tooltip').style.opacity = '0';
-  };
-}
-
-function showChartTooltip(text, x, y) {
-  const t = document.getElementById('chart-tooltip');
-  t.textContent = text;
-  t.style.left = Math.min(x, window.innerWidth - 160) + 'px';
-  t.style.top = (y + window.scrollY - 10) + 'px';
-  t.style.opacity = '1';
-}
-
 function renderDetailTransactions(ticker) {
   const txs = state.transactions
     .filter(t => t.ticker === ticker)
@@ -3585,60 +3724,419 @@ function buildTxCard(tx, showEdit=false) {
 // ═══════════════════════════════════════════════════════════════
 // RENDER NEWS
 // ═══════════════════════════════════════════════════════════════
-function renderNews() {
-  const accounts = state.settings.twitterAccounts || [];
-  const container = document.getElementById('news-feeds-container');
-  const countEl   = document.getElementById('news-account-count');
+// ─── News helpers ────────────────────────────────────────────────────────────
+function newsTimeAgo(unixSec) {
+  const diff = Math.floor(Date.now() / 1000) - unixSec;
+  if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function newsArticleCard(article) {
+  const headline = (article.headline || article.summary || 'No headline').slice(0, 120);
+  const source = article.source || '';
+  const time = article.datetime ? newsTimeAgo(article.datetime) : '';
+  const img = article.image || '';
+  const url = article.url || '#';
+  return `<div class="news-article-card">
+    <a href="${url}" target="_blank" rel="noopener" class="news-article-inner">
+      ${img ? `<img class="news-thumb" src="${img}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+      <div class="news-body">
+        <div class="news-headline">${headline}</div>
+        <div class="news-meta">
+          ${source ? `<span class="news-source-badge">${source}</span>` : ''}
+          ${time ? `<span>${time}</span>` : ''}
+        </div>
+      </div>
+    </a>
+  </div>`;
+}
+
+function sectionWrap(title, html) {
+  return `<div class="news-section-title">${title}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 4px">${html}</div>`;
+}
+
+function infoCard(content) {
+  return `<div style="margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">${content}</div>`;
+}
+
+// ─── News Tab ─────────────────────────────────────────────────────────────────
+async function renderNews() {
+  const container = document.getElementById('news-tab-container');
   if (!container) return;
-
-  if (countEl) countEl.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
-
-  if (!accounts.length) {
+  const key = state.settings.apiKey;
+  if (!key) {
     container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
-      <div class="icon">📰</div>
-      <h3>No accounts added</h3>
-      <p>Add Twitter accounts in Settings to see their feeds here</p>
+      <div class="icon">🔑</div><h3>API Key Required</h3>
+      <p>Add your Finnhub API key in Settings to see market intelligence</p>
     </div>`;
     return;
   }
+  container.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">Loading market data…</div>`;
 
-  // Build a card per account with the Twitter embed widget
-  container.innerHTML = accounts.map(handle => `
-    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text)" style="flex-shrink:0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-          <span style="font-weight:600;font-size:14px">@${handle}</span>
+  const tickers = [...new Set(state.transactions.map(t => t.ticker))];
+  const sections = [];
+
+  // ── 1. PORTFOLIO SNAPSHOT ─────────────────────────────────────
+  const holdings = getHoldings().filter(h => h.shares > 0);
+  if (holdings.length) {
+    const totalVal  = holdings.reduce((s,h) => s + (h.currentValue || 0), 0);
+    const totalCost = holdings.reduce((s,h) => s + h.costBasis, 0);
+    const totalPnl  = totalVal - totalCost;
+    const pnlPct    = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
+    const cards = holdings.map(h => {
+      const chg1d = state.prices[h.ticker]?.change1d;
+      const chgPct = state.prices[h.ticker]?.changePct1d;
+      const sign = chg1d != null ? (chg1d >= 0 ? 'positive' : 'negative') : '';
+      return `<div class="metric-card" style="cursor:pointer" onclick="navigate('detail','${h.ticker}')">
+        <div class="metric-label">${h.ticker}</div>
+        <div class="metric-val">${h.currentValue != null ? fmt$(h.currentValue) : '—'}</div>
+        <div class="metric-sub ${sign}">${chg1d != null ? (chg1d>=0?'+':'')+fmt$(chg1d)+' today' : (h.unrealizedPct != null ? fmtPct(h.unrealizedPct)+' total' : '—')}</div>
+      </div>`;
+    }).join('');
+    sections.push(`<div class="news-section-title">📊 Portfolio Today</div>
+      <div class="metric-grid">${cards}</div>
+      ${infoCard(`<div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total Value</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono)">${fmt$(totalVal)}</div></div>
+        <div style="text-align:right"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total P&amp;L</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono);${totalPnl>=0?'color:var(--green)':'color:var(--red)'}">${totalPnl>=0?'+':''}${fmt$(totalPnl)}</div>
+          <div style="font-size:12px;${totalPnl>=0?'color:var(--green)':'color:var(--red)'}">${fmtPct(pnlPct)}</div>
         </div>
-        <a href="https://x.com/${handle}" target="_blank"
-           style="font-size:11px;color:var(--text3);text-decoration:none;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">
-          Open ↗
-        </a>
-      </div>
-      <div style="max-height:600px;overflow-y:auto;-webkit-overflow-scrolling:touch">
-        <a class="twitter-timeline"
-           data-height="600"
-           data-theme="light"
-           data-chrome="noheader nofooter noborders"
-           href="https://twitter.com/${handle}">
-          <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Loading @${handle}…</div>
-        </a>
-      </div>
-    </div>
-  `).join('');
+      </div>`)}`);
+  }
 
-  // Load or re-run Twitter widget script
-  if (window.twttr && window.twttr.widgets) {
-    window.twttr.widgets.load(container);
-  } else if (!document.getElementById('twitter-widget-script')) {
-    const script = document.createElement('script');
-    script.id  = 'twitter-widget-script';
-    script.src = 'https://platform.twitter.com/widgets.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.twttr && window.twttr.widgets) window.twttr.widgets.load(container);
-    };
-    document.head.appendChild(script);
+  // ── 2. MARKET NEWS ────────────────────────────────────────────
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${key}`);
+    const articles = await r.json();
+    if (Array.isArray(articles) && articles.length) {
+      const top = articles.slice(0, 8);
+      sections.push(sectionWrap('🌍 Market Headlines', top.map(newsArticleCard).join('')));
+    }
+  } catch(e) {}
+
+  // ── 3. ANALYST RECOMMENDATIONS for each holding ───────────────
+  const recPromises = tickers.slice(0, 4).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${ticker}&token=${key}`);
+      const data = await r.json();
+      if (!Array.isArray(data) || !data.length) return null;
+      const latest = data[0]; // most recent month
+      const total = (latest.strongBuy||0)+(latest.buy||0)+(latest.hold||0)+(latest.sell||0)+(latest.strongSell||0);
+      if (!total) return null;
+      const bars = [
+        { label: 'Strong Buy', val: latest.strongBuy||0, color: '#1a9e5c' },
+        { label: 'Buy',        val: latest.buy||0,        color: '#4caf50' },
+        { label: 'Hold',       val: latest.hold||0,       color: '#f59e0b' },
+        { label: 'Sell',       val: latest.sell||0,       color: '#f97316' },
+        { label: 'Strong Sell',val: latest.strongSell||0, color: '#d63b3b' },
+      ];
+      return `<div class="analyst-bar-wrap">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px">${ticker} — Analyst Ratings <span style="font-size:11px;font-weight:400;color:var(--text3)">${latest.period || ''}</span></div>
+        ${bars.map(b => `<div class="analyst-bar-row">
+          <div class="analyst-bar-label">${b.label}</div>
+          <div class="analyst-bar-track"><div class="analyst-bar-fill" style="width:${(b.val/total*100).toFixed(1)}%;background:${b.color}"></div></div>
+          <div class="analyst-bar-count">${b.val}</div>
+        </div>`).join('')}
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">${total} analysts</div>
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const recResults = (await Promise.all(recPromises)).filter(Boolean);
+  if (recResults.length) sections.push(`<div class="news-section-title">📈 Analyst Ratings</div>${recResults.join('')}`);
+
+  // ── 4. PRICE TARGETS ─────────────────────────────────────────
+  const ptPromises = tickers.slice(0, 4).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${key}`);
+      const d = await r.json();
+      if (!d || !d.targetMean) return null;
+      const price = state.prices[ticker]?.price;
+      const updown = price && d.targetMean ? ((d.targetMean - price) / price * 100).toFixed(1) : null;
+      return `<div class="metric-card" style="grid-column:span 1">
+        <div class="metric-label">${ticker} — Price Target</div>
+        <div class="metric-val">${fmt$(d.targetMean)}</div>
+        <div class="metric-sub">High: ${fmt$(d.targetHigh)} · Low: ${fmt$(d.targetLow)}</div>
+        ${updown ? `<div class="metric-sub ${parseFloat(updown)>=0?'positive':'negative'}">${parseFloat(updown)>=0?'+':''}${updown}% from current</div>` : ''}
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const ptResults = (await Promise.all(ptPromises)).filter(Boolean);
+  if (ptResults.length) sections.push(`<div class="news-section-title">🎯 Price Targets</div><div class="metric-grid" style="padding:0 16px 4px">${ptResults.join('')}</div>`);
+
+  // ── 5. EARNINGS CALENDAR ─────────────────────────────────────
+  try {
+    const now = new Date();
+    const from = now.toISOString().split('T')[0];
+    const to = new Date(Date.now() + 60*86400000).toISOString().split('T')[0];
+    const r = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${key}`);
+    const d = await r.json();
+    const items = (d.earningsCalendar || [])
+      .filter(e => tickers.includes(e.symbol))
+      .slice(0, 6);
+    if (items.length) {
+      const rows = items.map(e => {
+        const dt = new Date(e.date + 'T12:00:00Z');
+        return `<div class="calendar-item">
+          <div class="cal-date-box">
+            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
+            <div class="cal-date-day">${dt.getUTCDate()}</div>
+          </div>
+          <div class="cal-info">
+            <div class="cal-title">${e.symbol} Earnings</div>
+            <div class="cal-sub">${e.hour === 'bmo' ? 'Before Market Open' : e.hour === 'amc' ? 'After Market Close' : e.hour || ''}
+              ${e.epsEstimate ? ` · EPS est. ${fmt$(e.epsEstimate)}` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      sections.push(`<div class="news-section-title">📅 Upcoming Earnings</div>${infoCard(rows)}`);
+    }
+  } catch(e) {}
+
+  // ── 6. EARNINGS SURPRISES ─────────────────────────────────────
+  const epsPromises = tickers.slice(0, 3).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/earnings?symbol=${ticker}&limit=4&token=${key}`);
+      const data = await r.json();
+      if (!Array.isArray(data) || !data.length) return null;
+      const rows = data.map(e => {
+        const beat = e.actual != null && e.estimate != null
+          ? (e.actual >= e.estimate ? 'beat' : 'miss') : '';
+        const surprise = e.actual != null && e.estimate != null
+          ? ((e.actual - e.estimate) / Math.abs(e.estimate || 1) * 100).toFixed(1) : null;
+        return `<tr>
+          <td>${e.period || e.date || ''}</td>
+          <td>${e.actual != null ? fmt$(e.actual) : '—'}</td>
+          <td>${e.estimate != null ? fmt$(e.estimate) : '—'}</td>
+          <td class="${beat}">${surprise != null ? (parseFloat(surprise)>=0?'+':'')+surprise+'%' : '—'}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Quarterly EPS</div>
+        <div style="padding:4px 14px 10px;overflow-x:auto">
+          <table class="earnings-table"><thead><tr>
+            <th>Quarter</th><th>Actual</th><th>Estimate</th><th>Surprise</th>
+          </tr></thead><tbody>${rows}</tbody></table>
+        </div>
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const epsResults = (await Promise.all(epsPromises)).filter(Boolean);
+  if (epsResults.length) sections.push(`<div class="news-section-title">📊 Earnings History</div>${epsResults.join('')}`);
+
+  // ── 7. INSIDER TRANSACTIONS ───────────────────────────────────
+  const insiderPromises = tickers.slice(0, 3).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/insider-transactions?symbol=${ticker}&token=${key}`);
+      const d = await r.json();
+      const txs = (d.data || []).filter(t => t.share && t.share !== 0).slice(0, 5);
+      if (!txs.length) return null;
+      const rows = txs.map(t => {
+        const isBuy = (t.transactionCode === 'P' || (t.share > 0));
+        return `<div class="insider-row">
+          <div class="insider-dot ${isBuy?'buy':'sell'}"></div>
+          <div class="insider-name">${t.name || 'Unknown'}</div>
+          <div>
+            <div class="insider-detail">${isBuy ? '+' : ''}${(t.share||0).toLocaleString()} shares</div>
+            <div class="insider-detail">${t.transactionDate || t.filingDate || ''}</div>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Insider Activity</div>
+        ${rows}
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const insiderResults = (await Promise.all(insiderPromises)).filter(Boolean);
+  if (insiderResults.length) sections.push(`<div class="news-section-title">👤 Insider Transactions</div>${insiderResults.join('')}`);
+
+  // ── 8. BASIC FINANCIALS ───────────────────────────────────────
+  const finPromises = tickers.slice(0, 4).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${key}`);
+      const d = await r.json();
+      const m = d.metric || {};
+      const rows = [
+        ['52W High',      m['52WeekHigh'] != null ? fmt$(m['52WeekHigh']) : null],
+        ['52W Low',       m['52WeekLow']  != null ? fmt$(m['52WeekLow'])  : null],
+        ['P/E (TTM)',     m.peBasicExclExtraTTM != null ? fmtNum(m.peBasicExclExtraTTM,2) : null],
+        ['P/S (TTM)',     m.psTTM != null ? fmtNum(m.psTTM,2) : null],
+        ['P/B',          m.pbAnnual != null ? fmtNum(m.pbAnnual,2) : null],
+        ['EPS (TTM)',     m.epsTTM != null ? fmt$(m.epsTTM) : null],
+        ['Rev/Share',     m.revenuePerShareTTM != null ? fmt$(m.revenuePerShareTTM) : null],
+        ['Beta',         m.beta != null ? fmtNum(m.beta,2) : null],
+        ['Div Yield',    m.dividendYieldIndicatedAnnual != null ? fmtPct(m.dividendYieldIndicatedAnnual) : null],
+        ['ROE (TTM)',    m.roeTTM != null ? fmtPct(m.roeTTM) : null],
+        ['Gross Margin', m.grossMarginTTM != null ? fmtPct(m.grossMarginTTM) : null],
+        ['Debt/Equity',  m.totalDebt_totalEquityAnnual != null ? fmtNum(m.totalDebt_totalEquityAnnual,2) : null],
+      ].filter(([,v]) => v != null);
+      if (!rows.length) return null;
+      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Fundamentals</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:4px 0">
+          ${rows.map(([l,v])=>`<div style="padding:7px 14px;border-bottom:1px solid var(--border);font-size:12px">
+            <div style="color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px">${l}</div>
+            <div style="font-weight:600;font-family:var(--mono)">${v}</div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const finResults = (await Promise.all(finPromises)).filter(Boolean);
+  if (finResults.length) sections.push(`<div class="news-section-title">🏦 Fundamentals</div>${finResults.join('')}`);
+
+  // ── 9. NEWS SENTIMENT ─────────────────────────────────────────
+  const sentPromises = tickers.slice(0, 4).map(async ticker => {
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/news-sentiment?symbol=${ticker}&token=${key}`);
+      const d = await r.json();
+      if (!d || d.sentiment == null) return null;
+      const score = d.companyNewsScore ?? d.sentiment?.bearishPercent ?? null;
+      const buzz = d.buzz?.articlesInLastWeek ?? d.buzz?.weeklyAverage ?? null;
+      const bull = d.sentiment?.bullishPercent != null ? (d.sentiment.bullishPercent * 100).toFixed(0) : null;
+      const bear = d.sentiment?.bearishPercent != null ? (d.sentiment.bearishPercent * 100).toFixed(0) : null;
+      return `<div class="metric-card">
+        <div class="metric-label">${ticker} Sentiment</div>
+        ${bull ? `<div class="metric-val positive">+${bull}% bullish</div>` : '<div class="metric-val">—</div>'}
+        ${bear ? `<div class="metric-sub negative">${bear}% bearish</div>` : ''}
+        ${buzz ? `<div class="metric-sub">${buzz} articles/wk</div>` : ''}
+      </div>`;
+    } catch(e) { return null; }
+  });
+  const sentResults = (await Promise.all(sentPromises)).filter(Boolean);
+  if (sentResults.length) sections.push(`<div class="news-section-title">💬 News Sentiment</div><div class="metric-grid" style="padding:0 16px 4px">${sentResults.join('')}</div>`);
+
+  // ── 10. IPO CALENDAR ─────────────────────────────────────────
+  try {
+    const from = new Date().toISOString().split('T')[0];
+    const to = new Date(Date.now() + 30*86400000).toISOString().split('T')[0];
+    const r = await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${from}&to=${to}&token=${key}`);
+    const d = await r.json();
+    const ipos = (d.ipoCalendar || []).slice(0, 6);
+    if (ipos.length) {
+      const rows = ipos.map(ipo => {
+        const dt = new Date(ipo.date + 'T12:00:00Z');
+        return `<div class="calendar-item">
+          <div class="cal-date-box" style="background:var(--accent-dark,#4f46e5)">
+            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
+            <div class="cal-date-day">${dt.getUTCDate()}</div>
+          </div>
+          <div class="cal-info">
+            <div class="cal-title">${ipo.name || ipo.symbol || 'Unknown'} (${ipo.symbol || ''})</div>
+            <div class="cal-sub">${ipo.exchange || ''} · ${ipo.numberOfShares ? (ipo.numberOfShares/1e6).toFixed(1)+'M shares' : ''}
+              ${ipo.price ? ' · $'+ipo.price : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      sections.push(`<div class="news-section-title">🚀 Upcoming IPOs</div>${infoCard(rows)}`);
+    }
+  } catch(e) {}
+
+  // ── 11. ECONOMIC CALENDAR ─────────────────────────────────────
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/calendar/economic?token=${key}`);
+    const d = await r.json();
+    const events = (d.economicCalendar || [])
+      .filter(e => e.impact === 'high' || e.impact === 'medium')
+      .slice(0, 8);
+    if (events.length) {
+      const rows = events.map(ev => {
+        const dt = new Date(ev.time || (ev.date + 'T12:00:00Z'));
+        return `<div class="calendar-item">
+          <div class="cal-date-box" style="background:${ev.impact==='high'?'#d63b3b':'#f59e0b'}">
+            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
+            <div class="cal-date-day">${dt.getDate()}</div>
+          </div>
+          <div class="cal-info">
+            <div class="cal-title">${ev.event || ev.name || '—'}</div>
+            <div class="cal-sub">${ev.country || ''} · ${ev.impact || ''} impact
+              ${ev.actual != null ? ` · Actual: ${ev.actual}` : ''}
+              ${ev.estimate != null ? ` · Est: ${ev.estimate}` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      sections.push(`<div class="news-section-title">🏛 Economic Calendar</div>${infoCard(rows)}`);
+    }
+  } catch(e) {}
+
+  // ── 12. STOCK UPGRADES / DOWNGRADES ──────────────────────────
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${tickers.slice(0,3).join(',')}&token=${key}`);
+    const data = await r.json();
+    const items = Array.isArray(data) ? data.slice(0, 8) : [];
+    if (items.length) {
+      const rows = items.map(u => {
+        const isUp = (u.toGrade || '').toLowerCase().includes('buy') || (u.toGrade||'') > (u.fromGrade||'');
+        const badge = (u.action||'').toLowerCase();
+        const badgeColor = badge.includes('upgrade') ? 'var(--green)' : badge.includes('downgrade') ? 'var(--red)' : 'var(--text3)';
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+          <div style="min-width:50px;font-size:13px;font-weight:700;color:var(--text)">${u.symbol}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${u.firm || 'Unknown Firm'}</div>
+            <div style="font-size:11px;color:var(--text3)">${u.fromGrade||'—'} → <span style="font-weight:600;color:${badgeColor}">${u.toGrade||'—'}</span></div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);white-space:nowrap">${u.gradeDate || ''}</div>
+        </div>`;
+      }).join('');
+      sections.push(`<div class="news-section-title">⬆️ Upgrades & Downgrades</div>
+        <div style="margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">${rows}</div>`);
+    }
+  } catch(e) {}
+
+  // ── 13. STOCK-SPECIFIC NEWS ───────────────────────────────────
+  const stockNewsPromises = tickers.slice(0, 3).map(async ticker => {
+    try {
+      const to   = new Date().toISOString().split('T')[0];
+      const from = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+      const r = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${key}`);
+      const articles = await r.json();
+      if (!Array.isArray(articles) || !articles.length) return null;
+      const top = articles.slice(0, 4);
+      return `<div class="news-section-title">📰 ${ticker} News</div>
+        <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 4px">
+          ${top.map(newsArticleCard).join('')}
+        </div>`;
+    } catch(e) { return null; }
+  });
+  const stockNewsResults = (await Promise.all(stockNewsPromises)).filter(Boolean);
+  sections.push(...stockNewsResults);
+
+  container.innerHTML = sections.length
+    ? sections.join('') + '<div style="height:16px"></div>'
+    : '<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">No data available. Check your API key in Settings.</div>';
+}
+
+async function refreshNewsTab() {
+  const container = document.getElementById('news-tab-container');
+  if (container) container.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">Refreshing…</div>`;
+  await renderNews();
+}
+
+// ─── Stock-page news ──────────────────────────────────────────────────────────
+async function renderStockNews(ticker) {
+  const el = document.getElementById('detail-stock-news');
+  if (!el) return;
+  const key = state.settings.apiKey;
+  if (!key) { el.innerHTML = '<div style="color:var(--text3);font-size:12px">Add API key in Settings to see news</div>'; return; }
+
+  try {
+    const to   = new Date().toISOString().split('T')[0];
+    const from = new Date(Date.now() - 14*86400000).toISOString().split('T')[0];
+    const r = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${key}`);
+    const articles = await r.json();
+    if (!Array.isArray(articles) || !articles.length) {
+      el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">No recent news found</div>';
+      return;
+    }
+    el.innerHTML = articles.slice(0, 10).map(newsArticleCard).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px">Failed to load news</div>';
   }
 }
 
@@ -3647,28 +4145,20 @@ function addTwitterAccount() {
   if (!input) return;
   let handle = input.value.trim().replace(/^@/, '');
   if (!handle) return;
-  // Basic validation — alphanumeric + underscore only
-  if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) {
-    showToast('Invalid username — only letters, numbers, and underscores', 'error');
-    return;
-  }
+  if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) { showToast('Invalid username', 'error'); return; }
   if (!state.settings.twitterAccounts) state.settings.twitterAccounts = [];
   if (state.settings.twitterAccounts.map(h => h.toLowerCase()).includes(handle.toLowerCase())) {
-    showToast('@' + handle + ' is already in your feed', 'error');
-    return;
+    showToast('@' + handle + ' already added', 'error'); return;
   }
   state.settings.twitterAccounts.push(handle);
-  save();
-  input.value = '';
+  save(); input.value = '';
   renderTwitterAccountsList();
-  showToast('@' + handle + ' added to News feed', 'success');
+  showToast('@' + handle + ' saved', 'success');
 }
 
 function removeTwitterAccount(handle) {
   state.settings.twitterAccounts = (state.settings.twitterAccounts || []).filter(h => h !== handle);
-  save();
-  renderTwitterAccountsList();
-  showToast('@' + handle + ' removed', '');
+  save(); renderTwitterAccountsList();
 }
 
 function renderTwitterAccountsList() {
@@ -3676,21 +4166,14 @@ function renderTwitterAccountsList() {
   if (!el) return;
   const accounts = state.settings.twitterAccounts || [];
   if (!accounts.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No accounts added yet</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No accounts saved</div>';
     return;
   }
-  el.innerHTML = accounts.map(handle => `
+  el.innerHTML = accounts.map(h => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:var(--radius-sm);padding:9px 12px">
-      <div style="display:flex;align-items:center;gap:7px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--text2)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        <span style="font-size:13px;font-weight:500">@${handle}</span>
-      </div>
-      <button onclick="removeTwitterAccount('${handle}')"
-        style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:2px 6px;font-family:var(--font);font-weight:500">
-        Remove
-      </button>
-    </div>
-  `).join('');
+      <span style="font-size:13px;font-weight:500">@${h}</span>
+      <button onclick="removeTwitterAccount('${h}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:2px 6px;font-family:var(--font);font-weight:500">Remove</button>
+    </div>`).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4279,9 +4762,9 @@ function init() {
 
   // Redraw chart on resize
   window.addEventListener('resize', () => {
-    if (chartData && document.getElementById('screen-detail').classList.contains('active')) {
+    if (chartData && currentDetailTicker && document.getElementById('screen-detail').classList.contains('active')) {
       const cached = _chartCache[`${currentDetailTicker}_${chartPeriod}`];
-      drawChart(chartData, cached?.isOHLC ?? false);
+      drawChart(chartData, cached?.isOHLC ?? false, cached?.openPrice);
     }
   });
 
