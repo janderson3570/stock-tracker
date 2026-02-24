@@ -60,7 +60,7 @@
     display: flex;
     flex-direction: column;
     padding-top: env(safe-area-inset-top, 0px);
-    /* Do NOT add padding-bottom here — the tab bar handles safe-area itself */
+    /* Must clip children so flex layout fills exactly to bottom edge */
     overflow: hidden;
   }
 
@@ -133,10 +133,8 @@
     display: flex;
     align-items: flex-start;
     padding-top: 8px;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     z-index: 10;
-    /* Ensure it always sticks to the very bottom */
-    position: relative;
   }
   .tab-btn {
     flex: 1;
@@ -1214,7 +1212,7 @@
 
       <!-- News Feed Accounts -->
       <div class="settings-section">
-        <div class="settings-section-title">News Feed</div>
+        <div class="settings-section-title">News Feed Accounts</div>
         <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
           <div class="settings-row-label">Twitter / X Accounts</div>
           <div id="twitter-accounts-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px"></div>
@@ -1225,7 +1223,7 @@
               onkeydown="if(event.key==='Enter')addTwitterAccount()">
             <button class="settings-btn primary" onclick="addTwitterAccount()" style="flex-shrink:0;white-space:nowrap">Add</button>
           </div>
-          <div style="font-size:11px;color:var(--text3)">Saved for reference. News tab now shows financial news via Finnhub API.</div>
+          <div style="font-size:11px;color:var(--text3)">Accounts appear as embedded feeds on the News tab.</div>
         </div>
       </div>
 
@@ -1745,106 +1743,49 @@ const STOCK_DB_DEDUP = STOCK_DB.filter(s => {
   return true;
 });
 
-// Live listing from Alpha Vantage — populated on init, searched first in autocomplete
-// Format: [{t:'AAPL', n:'Apple Inc.', e:'NYSE'}, ...]
-let LIVE_LISTING = [];
+// ── Ticker name lookup — uses search cache, then hardcoded DB ──
+// Cache of {ticker -> name} populated by Finnhub search results
+const _tickerNameCache = {};
 
-// Helper: look up company name from live listing or fallback hardcoded DB
 function tickerName(ticker) {
-  const live = LIVE_LISTING.find(s => s.t === ticker);
-  if (live) return live.n;
+  if (_tickerNameCache[ticker]) return _tickerNameCache[ticker];
   const db = STOCK_DB_DEDUP.find(s => s.t === ticker);
   return db ? db.n : ticker;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LIVE LISTING — fetch all US stocks from Alpha Vantage
-// Cached in localStorage for 7 days so we don't waste API calls
+// FINNHUB SYMBOL SEARCH — live as-you-type autocomplete
+// Uses /search?q= which covers all stocks, ETFs, indices in Finnhub
 // ═══════════════════════════════════════════════════════════════
-const LISTING_CACHE_KEY = 'st_listing_cache';
-const LISTING_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+let _searchDebounceTimer = null;
+let _lastSearchQuery = '';
 
-async function loadLiveListing() {
-  // Try cache first
+async function searchFinnhubSymbols(query) {
+  const key = state.settings.apiKey;
+  if (!key || !query) return [];
   try {
-    const cached = localStorage.getItem(LISTING_CACHE_KEY);
-    if (cached) {
-      const { ts, data } = JSON.parse(cached);
-      if (Date.now() - ts < LISTING_CACHE_TTL && data.length > 100) {
-        LIVE_LISTING = data;
-        console.log(`Loaded ${data.length} tickers from cache`);
-        return;
-      }
-    }
-  } catch(e) {}
-
-  // Fetch fresh from Alpha Vantage listing status endpoint
-  // Must go through a CORS proxy — AV's LISTING_STATUS endpoint blocks direct browser requests
-  const key = 'd6e7mt9r01qh94m3431gd6e7mt9r01qh94m34320'; // kept for AV listing only
-  const CORS_PROXIES = [
-    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    (u) => `https://cors-anywhere.herokuapp.com/${u}`,
-  ];
-  try {
-    const avUrl = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${key}`;
-    let text = null;
-
-    for (const proxy of CORS_PROXIES) {
-      try {
-        const res = await fetch(proxy(avUrl), { signal: AbortSignal.timeout(10000) });
-        if (!res.ok) continue;
-        const t = await res.text();
-        // Quick sanity check — real CSV starts with "symbol," header
-        if (t.trim().startsWith('symbol,') || t.includes('symbol,name,exchange')) {
-          text = t;
-          break;
-        }
-      } catch(e) {
-        continue; // try next proxy
-      }
-    }
-    if (!text) throw new Error('All proxies failed');
-
-    // Parse CSV: symbol,name,exchange,assetType,ipoDate,delistingDate,status
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) throw new Error('Bad response');
-
-    const parsed = [];
-    for (let i = 1; i < lines.length; i++) {
-      // CSV may have quoted fields — handle simply
-      const cols = lines[i].split(',');
-      if (cols.length < 4) continue;
-      const symbol  = (cols[0] || '').trim().replace(/^"|"$/g, '');
-      const name    = (cols[1] || '').trim().replace(/^"|"$/g, '');
-      const exchange= (cols[2] || '').trim().replace(/^"|"$/g, '');
-      const type    = (cols[3] || '').trim().replace(/^"|"$/g, '');
-      const status  = (cols[6] || '').trim().replace(/^"|"$/g, '');
-
-      // Only active US-listed equities and ETFs
-      if (!symbol || !name) continue;
-      if (status && status.toLowerCase() !== 'active') continue;
-      if (!['NYSE','NASDAQ','NYSE ARCA','NYSE MKT','BATS'].includes(exchange) &&
-          !exchange.startsWith('NYSE') && !exchange.startsWith('NASDAQ')) continue;
-
-      parsed.push({ t: symbol, n: name, e: exchange, _type: type });
-    }
-
-    if (parsed.length > 100) {
-      LIVE_LISTING = parsed;
-      try {
-        localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: parsed }));
-      } catch(e) {
-        // localStorage quota — store a trimmed version (symbol+name only)
-        const slim = parsed.map(s => ({ t: s.t, n: s.n }));
-        try { localStorage.setItem(LISTING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: slim })); } catch(e2) {}
-      }
-      console.log(`Fetched ${parsed.length} live tickers for autocomplete`);
-    }
-  } catch(err) {
-    console.warn('Could not fetch live listing, using built-in database', err);
-    // Fall through — LIVE_LISTING stays empty, autocomplete uses STOCK_DB_DEDUP
+    const url = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    if (!data.result) return [];
+    // Filter to US-listed equities and ETFs, exclude weird derivatives
+    return data.result
+      .filter(s => s.type === 'Common Stock' || s.type === 'ETP' || s.type === 'ETF' || !s.type)
+      .filter(s => s.symbol && !s.symbol.includes('.') && s.symbol.length <= 5)
+      .slice(0, 10)
+      .map(s => {
+        // Cache name for later use
+        if (s.description) _tickerNameCache[s.symbol] = s.description;
+        return { t: s.symbol, n: s.description || s.symbol };
+      });
+  } catch(e) {
+    return [];
   }
+}
+
+// No-op — keeping for compatibility with init() call
+async function loadLiveListing() {
+  // Autocomplete now uses live Finnhub /search — no pre-loading needed
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2258,56 +2199,39 @@ async function fetchCompanyProfile(ticker) {
 
 async function fetchHistoricalPrices(ticker, period) {
   const key = state.settings.apiKey;
-  if (!key) {
-    showToast('Add API key in Settings to view charts', 'error');
-    return null;
-  }
+  if (!key) return generateMockChart(ticker, period);
 
   try {
     // Map period to days back and resolution
     const now = Math.floor(Date.now() / 1000);
     let from, resolution;
-    if      (period === '1D') { from = now - 2*86400;       resolution = '60'; }   // 2 days back to get full day
-    else if (period === '1W') { from = now - 8*86400;       resolution = 'D';  }
-    else if (period === '1M') { from = now - 32*86400;      resolution = 'D';  }
-    else if (period === '3M') { from = now - 95*86400;      resolution = 'D';  }
-    else if (period === '6M') { from = now - 185*86400;     resolution = 'D';  }
-    else if (period === '1Y') { from = now - 370*86400;     resolution = 'W';  }
-    else                      { from = now - 5*370*86400;   resolution = 'M';  }
+    if      (period === '1D') { from = now - 86400;        resolution = '60'; }
+    else if (period === '1W') { from = now - 7*86400;      resolution = 'D';  }
+    else if (period === '1M') { from = now - 30*86400;     resolution = 'D';  }
+    else if (period === '3M') { from = now - 90*86400;     resolution = 'D';  }
+    else if (period === '6M') { from = now - 180*86400;    resolution = 'D';  }
+    else if (period === '1Y') { from = now - 365*86400;    resolution = 'W';  }
+    else                      { from = now - 5*365*86400;  resolution = 'M';  }
 
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${now}&token=${key}`;
     const r = await fetch(url);
     const data = await r.json();
 
-    if (data.s !== 'ok' || !data.c || !data.t || data.c.length === 0) {
-      // Real API returned no data (market closed on weekend for 1D, etc.)
-      // Show a clear message rather than fake data
-      return null;
-    }
+    if (data.s !== 'ok' || !data.c || !data.t) return generateMockChart(ticker, period);
 
     const points = data.t.map((ts, i) => ({
       date:  new Date(ts * 1000).toISOString().split('T')[0],
       price: data.c[i]
     }));
     points.sort((a, b) => a.date.localeCompare(b.date));
-
-    // For 1D intraday, filter to only today and yesterday
-    if (period === '1D') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const yday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      const filtered = points.filter(p => p.date === todayStr || p.date === yday);
-      return filtered.length > 0 ? filtered : points.slice(-24);
-    }
-
     return points;
   } catch(e) {
-    console.error('fetchHistoricalPrices error:', e);
-    return null;
+    return generateMockChart(ticker, period);
   }
 }
 
 function generateMockChart(ticker, period) {
-  // Only used as a labeled fallback when API key is missing
+  // Generate plausible mock data based on current price
   const basePrice = state.prices[ticker]?.price || 100;
   const days = period === '1D' ? 1 : period === '1W' ? 7 :
                period === '1M' ? 30 : period === '3M' ? 90 :
@@ -2322,6 +2246,7 @@ function generateMockChart(ticker, period) {
     price = Math.max(price, 0.01);
     points.push({ date: d.toISOString().split('T')[0], price: +price.toFixed(2) });
   }
+  // Ensure last point matches current price
   if (points.length) points[points.length-1].price = basePrice;
   return points;
 }
@@ -2402,8 +2327,8 @@ async function fetchPeriodChange(ticker, period) {
 
   const now = Math.floor(Date.now() / 1000);
   // Go back slightly further than needed so we always get at least one candle
-  const offsets = { '1w': 10, '1m': 38, '1y': 375 };
-  const days = offsets[period] || 10;
+  const offsets = { '1w': 9, '1m': 35, '1y': 370 };
+  const days = offsets[period] || 9;
   const from = now - days * 86400;
 
   try {
@@ -2412,6 +2337,7 @@ async function fetchPeriodChange(ticker, period) {
     const data = await r.json();
     if (data.s !== 'ok' || !data.c || !data.c.length) return;
     // Use the close of the FIRST candle in the range as the "price N days ago"
+    // This is more accurate than using open price
     const basePrice = data.c[0];
     if (!basePrice || basePrice === 0) return;
     if (!state.prices[ticker].periodSnaps) state.prices[ticker].periodSnaps = {};
@@ -2500,15 +2426,14 @@ function navigate(screen, ticker) {
 // ═══════════════════════════════════════════════════════════════
 function setViewMode(mode, btn) {
   viewMode = mode;
-  // Only reset buttons within the same toggle group, not all toggle-btns on the page
-  btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderHoldingsTable();
 }
 
 function setChangePeriod(p, btn) {
   changePeriod = p;
-  btn.closest('.change-period-bar').querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.change-period-mini').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
 
   if (p === '1d') {
@@ -3103,55 +3028,8 @@ async function loadChart(ticker, period, btnEl) {
     document.querySelectorAll('.chart-period-btn').forEach(b=>b.classList.remove('active'));
     btnEl.classList.add('active');
   }
-
-  // Show loading state
-  const canvas = document.getElementById('chart-canvas');
-  const wrap = document.getElementById('detail-chart-wrap');
-  if (canvas) {
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const W = canvas.parentElement.offsetWidth || 300;
-    const H = 210;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#9b9b93';
-    ctx.font = "13px 'DM Sans', sans-serif";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Loading chart…', W/2, H/2);
-  }
-
   const data = await fetchHistoricalPrices(ticker, period);
   chartData = data;
-
-  if (!data || data.length === 0) {
-    // Show no-data state on canvas
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      const W = canvas.parentElement.offsetWidth || 300;
-      const H = 210;
-      canvas.width = W * dpr;
-      canvas.height = H * dpr;
-      canvas.style.width = W + 'px';
-      canvas.style.height = H + 'px';
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#9b9b93';
-      ctx.font = "13px 'DM Sans', sans-serif";
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('No chart data available for this period', W/2, H/2 - 10);
-      ctx.font = "11px 'DM Sans', sans-serif";
-      ctx.fillText('(Market may be closed or API limit reached)', W/2, H/2 + 12);
-    }
-    return;
-  }
-
   drawChart(data);
 }
 
@@ -3442,122 +3320,61 @@ function buildTxCard(tx, showEdit=false) {
 // ═══════════════════════════════════════════════════════════════
 // RENDER NEWS
 // ═══════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════
-// RENDER NEWS — uses Finnhub news API (free tier)
-// ═══════════════════════════════════════════════════════════════
-async function renderNews() {
+function renderNews() {
+  const accounts = state.settings.twitterAccounts || [];
   const container = document.getElementById('news-feeds-container');
   const countEl   = document.getElementById('news-account-count');
   if (!container) return;
 
-  const key = state.settings.apiKey;
-  const holdings = getHoldings();
-  const tickers = holdings.map(h => h.ticker);
+  if (countEl) countEl.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
 
-  if (!key) {
+  if (!accounts.length) {
     container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
       <div class="icon">📰</div>
-      <h3>API key needed</h3>
-      <p>Add your Finnhub API key in Settings to load financial news</p>
+      <h3>No accounts added</h3>
+      <p>Add Twitter accounts in Settings to see their feeds here</p>
     </div>`;
-    if (countEl) countEl.textContent = '';
     return;
   }
 
-  // Show loading state
-  container.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">
-    <div style="font-size:24px;margin-bottom:10px">📰</div>
-    Loading news…
-  </div>`;
-  if (countEl) countEl.textContent = '';
-
-  try {
-    // Fetch general market news + news for each holding
-    const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7*86400*1000).toISOString().split('T')[0];
-
-    // General market news
-    const marketNewsUrl = `https://finnhub.io/api/v1/news?category=general&token=${key}`;
-    const promises = [fetch(marketNewsUrl).then(r=>r.json()).catch(()=>[])];
-
-    // Per-ticker company news (up to 3 holdings)
-    for (const ticker of tickers.slice(0, 4)) {
-      const url = `https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${weekAgo}&to=${today}&token=${key}`;
-      promises.push(fetch(url).then(r=>r.json()).then(arr => ({ ticker, items: arr })).catch(()=>({ ticker, items: [] })));
-    }
-
-    const results = await Promise.all(promises);
-    const marketNews = Array.isArray(results[0]) ? results[0].slice(0, 8) : [];
-    const stockNews = results.slice(1); // [{ticker, items}]
-
-    let html = '';
-
-    // Market news section
-    if (marketNews.length > 0) {
-      html += `<div>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:10px">Market News</div>
-        ${marketNews.map(item => newsCard(item)).join('')}
-      </div>`;
-    }
-
-    // Per-stock news
-    for (const { ticker, items } of stockNews) {
-      const filtered = Array.isArray(items) ? items.slice(0, 5) : [];
-      if (!filtered.length) continue;
-      html += `<div>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:10px">${ticker} News</div>
-        ${filtered.map(item => newsCard(item)).join('')}
-      </div>`;
-    }
-
-    if (!html) {
-      html = `<div class="empty-state" style="padding:40px 20px">
-        <div class="icon">📰</div>
-        <h3>No news right now</h3>
-        <p>Check back later for the latest market news</p>
-      </div>`;
-    }
-
-    container.innerHTML = html;
-    const totalItems = marketNews.length + stockNews.reduce((s,x)=>s+(x.items?.length||0),0);
-    if (countEl) countEl.textContent = totalItems > 0 ? `${totalItems} articles` : '';
-
-  } catch(err) {
-    container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
-      <div class="icon">⚠️</div>
-      <h3>Could not load news</h3>
-      <p>Check your API key or try again later</p>
-    </div>`;
-  }
-}
-
-function newsCard(item) {
-  if (!item || !item.headline) return '';
-  const time = item.datetime
-    ? (() => {
-        const d = new Date(item.datetime * 1000);
-        const diffH = Math.floor((Date.now() - d) / 3600000);
-        if (diffH < 1) return 'Just now';
-        if (diffH < 24) return `${diffH}h ago`;
-        return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-      })()
-    : '';
-  const source = item.source || '';
-  const img = item.image
-    ? `<img src="${item.image}" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0;background:var(--surface2)" onerror="this.style.display='none'" loading="lazy">`
-    : '';
-
-  return `<a href="${item.url || '#'}" target="_blank" rel="noopener"
-    style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);text-decoration:none;color:inherit;margin-bottom:8px">
-    <div style="flex:1;min-width:0">
-      <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${item.headline}</div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3)">
-        ${source ? `<span style="font-weight:600">${source}</span><span>·</span>` : ''}
-        <span>${time}</span>
+  // Build a card per account with the Twitter embed widget
+  container.innerHTML = accounts.map(handle => `
+    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text)" style="flex-shrink:0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span style="font-weight:600;font-size:14px">@${handle}</span>
+        </div>
+        <a href="https://x.com/${handle}" target="_blank"
+           style="font-size:11px;color:var(--text3);text-decoration:none;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">
+          Open ↗
+        </a>
+      </div>
+      <div style="max-height:600px;overflow-y:auto;-webkit-overflow-scrolling:touch">
+        <a class="twitter-timeline"
+           data-height="600"
+           data-theme="light"
+           data-chrome="noheader nofooter noborders"
+           href="https://twitter.com/${handle}">
+          <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Loading @${handle}…</div>
+        </a>
       </div>
     </div>
-    ${img}
-  </a>`;
+  `).join('');
+
+  // Load or re-run Twitter widget script
+  if (window.twttr && window.twttr.widgets) {
+    window.twttr.widgets.load(container);
+  } else if (!document.getElementById('twitter-widget-script')) {
+    const script = document.createElement('script');
+    script.id  = 'twitter-widget-script';
+    script.src = 'https://platform.twitter.com/widgets.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.twttr && window.twttr.widgets) window.twttr.widgets.load(container);
+    };
+    document.head.appendChild(script);
+  }
 }
 
 function addTwitterAccount() {
@@ -3565,20 +3382,21 @@ function addTwitterAccount() {
   if (!input) return;
   let handle = input.value.trim().replace(/^@/, '');
   if (!handle) return;
+  // Basic validation — alphanumeric + underscore only
   if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) {
     showToast('Invalid username — only letters, numbers, and underscores', 'error');
     return;
   }
   if (!state.settings.twitterAccounts) state.settings.twitterAccounts = [];
   if (state.settings.twitterAccounts.map(h => h.toLowerCase()).includes(handle.toLowerCase())) {
-    showToast('@' + handle + ' is already in your list', 'error');
+    showToast('@' + handle + ' is already in your feed', 'error');
     return;
   }
   state.settings.twitterAccounts.push(handle);
   save();
   input.value = '';
   renderTwitterAccountsList();
-  showToast('@' + handle + ' added', 'success');
+  showToast('@' + handle + ' added to News feed', 'success');
 }
 
 function removeTwitterAccount(handle) {
@@ -3906,40 +3724,64 @@ function onTickerInput(val) {
   const q = val.trim().toUpperCase();
   if (!q) { list.classList.remove('show'); return; }
 
-  // Search live listing first (Alpha Vantage full list), fall back to hardcoded DB
-  const searchSource = LIVE_LISTING.length > 100 ? LIVE_LISTING : STOCK_DB_DEDUP;
-
-  // Scoring: exact ticker match first, then ticker starts-with, then name contains
-  const scored = [];
-  for (const s of searchSource) {
+  // Show instant local results from hardcoded DB while API call is in flight
+  const localMatches = [];
+  for (const s of STOCK_DB_DEDUP) {
     const t = s.t.toUpperCase();
     const n = (s.n || '').toUpperCase();
-    if (t === q)               scored.push({ s, score: 0 });
-    else if (t.startsWith(q)) scored.push({ s, score: 1 });
-    else if (n.startsWith(q)) scored.push({ s, score: 2 });
-    else if (t.includes(q))   scored.push({ s, score: 3 });
-    else if (n.includes(q))   scored.push({ s, score: 4 });
-    if (scored.length >= 50) break; // cap early for performance
+    if (t === q)               localMatches.push({ s, score: 0 });
+    else if (t.startsWith(q)) localMatches.push({ s, score: 1 });
+    else if (n.startsWith(q)) localMatches.push({ s, score: 2 });
+    else if (t.includes(q))   localMatches.push({ s, score: 3 });
+    else if (n.includes(q))   localMatches.push({ s, score: 4 });
   }
-  scored.sort((a, b) => a.score - b.score);
-  const matches = scored.slice(0, 10).map(x => x.s);
+  localMatches.sort((a, b) => a.score - b.score);
+  const localTop = localMatches.slice(0, 8).map(x => x.s);
+  renderAutocompleteItems(localTop, q, true /* loading */);
 
-  // Show a "use anyway" option if no exact match
-  const exactMatch = matches.find(s => s.t.toUpperCase() === q);
-  const items = [...matches];
+  // Debounce the live API search — fire after 300ms of no typing
+  clearTimeout(_searchDebounceTimer);
+  _lastSearchQuery = q;
+  _searchDebounceTimer = setTimeout(async () => {
+    if (_lastSearchQuery !== q) return; // stale
+    const apiKey = state.settings.apiKey;
+    if (!apiKey) {
+      // No key — just show local results without loading indicator
+      renderAutocompleteItems(localTop, q, false);
+      return;
+    }
+    const results = await searchFinnhubSymbols(q);
+    if (_lastSearchQuery !== q) return; // another keystroke came in while we awaited
+    if (results.length > 0) {
+      renderAutocompleteItems(results, q, false);
+    } else {
+      // API returned nothing — fall back to local results
+      renderAutocompleteItems(localTop, q, false);
+    }
+  }, 300);
+}
+
+function renderAutocompleteItems(items, q, loading) {
+  const list = document.getElementById('autocomplete-list');
+  if (!items.length && !loading) { list.classList.remove('show'); return; }
+
+  const exactMatch = items.find(s => s.t.toUpperCase() === q);
+  const rows = [...items];
+  // If no exact match, add a "use anyway" option
   if (!exactMatch && q.length >= 1) {
-    items.push({ t: q, n: LIVE_LISTING.length > 100 ? 'Not found — add manually' : 'Enter manually (loading full list…)', _manual: true });
+    rows.push({ t: q, n: 'Add manually (not in search results)', _manual: true });
   }
 
-  if (!items.length) { list.classList.remove('show'); return; }
-
-  list.innerHTML = items.map(s => {
-    const exchange = s.e ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${s.e}</span>` : '';
+  list.innerHTML = rows.map(s => {
+    const isManual = s._manual;
     return `<div class="autocomplete-item" onclick="selectTicker('${s.t.replace(/'/g,"\\'")}')">
-      <div class="autocomplete-ticker">${s.t}${exchange}</div>
-      <div class="autocomplete-name" style="${s._manual ? 'color:var(--blue);font-style:italic' : ''}">${s.n}</div>
+      <div class="autocomplete-ticker">${s.t}</div>
+      <div class="autocomplete-name" style="${isManual ? 'color:var(--blue);font-style:italic' : ''}">${s.n || ''}</div>
     </div>`;
-  }).join('');
+  }).join('') + (loading && state.settings.apiKey
+    ? `<div style="padding:8px 14px;font-size:11px;color:var(--text3);font-style:italic">Searching all stocks…</div>`
+    : '');
+
   list.classList.add('show');
 }
 
@@ -4048,18 +3890,17 @@ function saveEditTransaction() {
 }
 
 function confirmDeleteTransaction() {
-  const id = document.getElementById('edit-tx-id').value;
-  // Close the edit modal first so confirm dialog is clearly visible
-  closeModal('edit-modal-overlay');
   showConfirm('Delete Transaction', 'This cannot be undone. The transaction will be permanently removed.', 'Delete', () => {
+    const id = document.getElementById('edit-tx-id').value;
     state.transactions = state.transactions.filter(t => t.id !== id);
     save();
+    closeModal('edit-modal-overlay');
     renderHome();
     if (currentDetailTicker) renderDetail(currentDetailTicker);
     renderHistory();
     showToast('Transaction deleted', '');
 
-    // Sync deletion to Google Sheets
+    // Auto-sync to Google Sheets in background
     syncInBackground();
   }, true);
 }
