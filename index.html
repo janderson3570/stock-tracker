@@ -596,90 +596,71 @@
   .stock-detail-price-change.positive { color: var(--green); }
   .stock-detail-price-change.negative { color: var(--red); }
 
-  /* ── CHART ── */
-  .chart-wrap {
+  /* ── PRICE CHANGE TABLE ── */
+  .price-table {
+    width: 100%;
+    border-collapse: collapse;
     background: var(--surface);
     border-radius: var(--radius);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
-    margin: 0 16px 16px;
-    padding: 12px 0 8px;
     overflow: hidden;
   }
-  .chart-header-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 0 14px 4px;
-  }
-  .chart-price-big {
-    font-size: 22px;
-    font-weight: 700;
-    font-family: var(--mono);
-    color: var(--text);
-    transition: color 0.15s;
-  }
-  .chart-change-label {
-    font-size: 12px;
-    font-weight: 500;
-    font-family: var(--mono);
-    transition: color 0.15s;
-  }
-  .chart-period-bar {
-    display: flex;
-    gap: 2px;
-    padding: 0 10px 10px;
-    overflow-x: auto;
-  }
-  .chart-period-btn {
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 12px;
+  .price-table th {
+    font-size: 10px;
     font-weight: 600;
-    border: none;
-    background: transparent;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: var(--text3);
-    cursor: pointer;
-    font-family: var(--font);
-    transition: all 0.15s;
-    flex-shrink: 0;
+    padding: 9px 13px;
+    text-align: right;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
   }
-  .chart-period-btn.active {
-    background: var(--accent);
-    color: white;
-  }
-  #chart-canvas {
-    width: 100%;
-    height: 180px;
-    display: block;
-  }
-  .chart-tooltip {
-    position: fixed;
-    background: rgba(20,20,28,0.92);
-    color: white;
-    font-size: 11px;
+  .price-table th:first-child { text-align: left; }
+  .price-table td {
+    padding: 10px 13px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
     font-family: var(--mono);
-    padding: 6px 10px;
-    border-radius: 6px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s;
-    white-space: nowrap;
-    z-index: 999;
-    backdrop-filter: blur(4px);
+    font-size: 13px;
+    color: var(--text);
   }
+  .price-table td:first-child {
+    text-align: left;
+    font-family: var(--font);
+    font-weight: 500;
+    color: var(--text2);
+    font-size: 12px;
+  }
+  .price-table tr:last-child td { border-bottom: none; }
+  .price-table .tbl-na { color: var(--text3); font-size: 11px; font-family: var(--font); }
+  .price-table .tbl-loading { color: var(--text3); font-size: 12px; font-family: var(--font); text-align: center; padding: 16px; }
+
+  /* ── ANALYST BAR ── */
+  .analyst-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .analyst-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .analyst-row:last-of-type { margin-bottom: 0; }
+  .analyst-lbl { font-size: 12px; color: var(--text2); width: 84px; flex-shrink: 0; }
+  .analyst-track { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .analyst-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .analyst-cnt { font-size: 12px; font-family: var(--mono); color: var(--text2); width: 24px; text-align: right; flex-shrink: 0; }
 
   /* ── NEWS CARDS ── */
-  .news-article-card {
+  .news-card {
     background: var(--surface);
     border-radius: var(--radius);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
-  .news-article-inner {
+  .news-card a {
     display: flex;
     gap: 12px;
     padding: 12px 14px;
@@ -687,8 +668,7 @@
     color: inherit;
   }
   .news-thumb {
-    width: 72px;
-    height: 72px;
+    width: 68px; height: 68px;
     object-fit: cover;
     border-radius: 6px;
     flex-shrink: 0;
@@ -696,148 +676,36 @@
   }
   .news-body { flex: 1; min-width: 0; }
   .news-headline {
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.35;
-    color: var(--text);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   }
-  .news-meta {
-    font-size: 11px;
-    color: var(--text3);
-    margin-top: 5px;
-    display: flex;
-    gap: 6px;
-    align-items: center;
+  .news-meta { font-size: 11px; color: var(--text3); margin-top: 5px; display: flex; gap: 6px; align-items: center; }
+  .news-source { background: var(--surface2); border-radius: 3px; padding: 1px 5px; font-weight: 600; font-size: 10px; color: var(--text2); }
+  .news-sec-hdr {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--text3); padding: 16px 16px 8px;
   }
-  .news-source-badge {
-    background: var(--surface2);
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-weight: 600;
-    font-size: 10px;
-    color: var(--text2);
-  }
-  .news-section-title {
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text3);
-    padding: 18px 16px 8px;
-  }
-  .news-section-title:first-child { padding-top: 8px; }
+  .news-sec-hdr:first-child { padding-top: 8px; }
 
-  /* ── METRIC GRID (news tab) ── */
-  .metric-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 0 16px 4px;
-  }
-  .metric-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 12px 14px;
-    box-shadow: var(--shadow);
-  }
-  .metric-label {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text3);
-    margin-bottom: 4px;
-  }
-  .metric-val {
-    font-size: 16px;
-    font-weight: 700;
-    font-family: var(--mono);
-    color: var(--text);
-  }
-  .metric-sub {
-    font-size: 11px;
-    color: var(--text3);
-    margin-top: 2px;
-  }
-
-  /* ── ANALYST ROW ── */
-  .analyst-bar-wrap {
-    margin: 0 16px 4px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    box-shadow: var(--shadow);
-  }
-  .analyst-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-  .analyst-bar-label { font-size: 12px; color: var(--text2); width: 80px; flex-shrink: 0; }
-  .analyst-bar-track {
-    flex: 1;
-    height: 8px;
-    background: var(--surface2);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .analyst-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
-  .analyst-bar-count { font-size: 12px; font-family: var(--mono); color: var(--text2); width: 22px; text-align: right; flex-shrink: 0; }
-
-  /* ── EARNINGS TABLE ── */
-  .earnings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .earnings-table th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text3); padding: 0 8px 8px; text-align: right; }
-  .earnings-table th:first-child { text-align: left; }
-  .earnings-table td { padding: 8px; border-top: 1px solid var(--border); text-align: right; font-family: var(--mono); }
-  .earnings-table td:first-child { text-align: left; font-family: var(--font); color: var(--text2); }
-  .earnings-table .beat { color: var(--green); }
-  .earnings-table .miss { color: var(--red); }
-
-  /* ── INSIDER TABLE ── */
-  .insider-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .insider-row:last-child { border-bottom: none; }
-  .insider-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .insider-dot.buy { background: var(--green); }
-  .insider-dot.sell { background: var(--red); }
-  .insider-name { font-size: 13px; font-weight: 500; flex: 1; }
-  .insider-detail { font-size: 11px; color: var(--text3); font-family: var(--mono); }
-
-  /* ── CALENDAR ITEM ── */
-  .calendar-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .calendar-item:last-child { border-bottom: none; }
-  .cal-date-box {
-    width: 44px;
-    text-align: center;
-    flex-shrink: 0;
-    background: var(--accent);
-    border-radius: 6px;
-    padding: 5px 4px;
-    color: white;
-  }
-  .cal-date-mon { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .cal-date-day { font-size: 18px; font-weight: 700; line-height: 1.1; }
+  /* ── EARNINGS CALENDAR ── */
+  .cal-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .cal-item:last-child { border-bottom: none; }
+  .cal-datebox { width: 42px; text-align: center; flex-shrink: 0; background: var(--accent); border-radius: 6px; padding: 4px 3px; color: white; }
+  .cal-mon { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cal-day { font-size: 18px; font-weight: 700; line-height: 1.1; }
   .cal-info { flex: 1; }
   .cal-title { font-size: 13px; font-weight: 600; }
   .cal-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ── PRICE TARGET TILES ── */
+  .pt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 4px; }
+  .pt-tile {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .pt-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); margin-bottom: 4px; }
+  .pt-val { font-size: 17px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .pt-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
 
   /* ── TRANSACTIONS ── */
   .transaction-list {
@@ -1274,24 +1142,14 @@
       </div>
       <div class="stock-detail-header" id="detail-header"></div>
       <div class="kpi-grid" style="padding:0 16px;margin-bottom:16px" id="detail-kpis"></div>
-      <div class="chart-wrap" id="detail-chart-wrap">
-        <div class="chart-header-row">
-          <div>
-            <div class="chart-price-big" id="chart-hover-price">—</div>
-            <div class="chart-change-label" id="chart-hover-change"></div>
-          </div>
-          <div class="chart-period-bar" id="chart-periods" style="padding:0;margin:0;flex:0 0 auto"></div>
-        </div>
-        <canvas id="chart-canvas"></canvas>
-      </div>
+      <p class="section-label">Price Performance</p>
+      <div id="detail-price-table" style="margin:0 16px 16px"></div>
+      <p class="section-label">Analyst Ratings</p>
+      <div id="detail-analyst" style="margin:0 16px 16px;color:var(--text3);font-size:13px">Loading…</div>
       <p class="section-label">Stock Details</p>
       <div class="detail-info-card" id="detail-info-card"></div>
       <p class="section-label mt16">Purchase History</p>
       <div class="transaction-list" id="detail-tx-list"></div>
-      <p class="section-label mt16">Recent News</p>
-      <div id="detail-stock-news" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">
-        <div style="color:var(--text3);font-size:13px;padding:12px 0">Loading news…</div>
-      </div>
     </div>
 
     <!-- HISTORY SCREEN -->
@@ -1462,10 +1320,10 @@
       <div class="page-content">
         <div class="section-header">
           <div class="section-title">Market Intelligence</div>
-          <button onclick="refreshNewsTab()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-xs)">Refresh</button>
+          <button onclick="renderNews()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-xs);cursor:pointer;color:var(--text3);font-size:12px;padding:4px 10px;font-family:var(--font)">↻ Refresh</button>
         </div>
       </div>
-      <div id="news-tab-container"></div>
+      <div id="news-container"></div>
     </div>
 
   </div><!-- end screen-container -->
@@ -1602,7 +1460,6 @@
 </div>
 
 <!-- CHART TOOLTIP -->
-<div class="chart-tooltip" id="chart-tooltip"></div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
@@ -2069,8 +1926,6 @@ let currentEditId = null;
 let confirmCallback = null;
 let currentTxType = 'buy';
 let editTxType = 'buy';
-let chartData = null;
-let chartPeriod = '1M';
 
 // ═══════════════════════════════════════════════════════════════
 // PERSISTENCE
@@ -2454,419 +2309,10 @@ async function fetchCompanyProfile(ticker) {
   } catch(e) {}
 }
 
-// ── Chart cache: key → {points, isOHLC, openPrice, fetchedAt} ──────────────
-const _chartCache = {};
-
-function isMarketOpen() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 570 && mins < 960;
-}
-
-function todayOpenETUnix() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  et.setHours(9, 30, 0, 0);
-  return Math.floor(et.getTime() / 1000);
-}
-
-function calendarDaysBackUnix(n) {
-  return Math.floor(Date.now() / 1000) - n * 86400;
-}
-
-// Raw Finnhub candle fetch → array of points or null
-async function finnhubCandle(ticker, resolution, from, to, key, includeOHLC) {
-  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${to}&token=${key}`;
-  const r = await fetch(url);
-  if (!r.ok) return null;
-  const data = await r.json();
-  if (data.s !== 'ok' || !data.c || data.c.length === 0) return null;
-
-  return data.t.map((ts, i) => {
-    const et = new Date(new Date(ts * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const date = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
-    const pt = { date, time: ts, price: data.c[i] };
-    if (includeOHLC) {
-      pt.open  = data.o?.[i] ?? data.c[i];
-      pt.high  = data.h?.[i] ?? data.c[i];
-      pt.low   = data.l?.[i] ?? data.c[i];
-      pt.close = data.c[i];
-    }
-    return pt;
-  }).filter(p => p.price > 0).sort((a, b) => a.time - b.time);
-}
-
-async function fetchHistoricalPrices(ticker, period) {
-  const key = state.settings.apiKey;
-  if (!key) return null;
-
-  const cacheKey = `${ticker}_${period}`;
-  const cached = _chartCache[cacheKey];
-  const ttl = isMarketOpen() ? 5 * 60 * 1000 : 30 * 60 * 1000;
-  if (cached && (Date.now() - cached.fetchedAt) < ttl) return cached;
-
-  const now = Math.floor(Date.now() / 1000);
-
-  try {
-    let points, isOHLC = false, openPrice = null;
-
-    if (period === '1D') {
-      // 60-min candles from today's 9:30am ET open
-      const from = todayOpenETUnix() - 300;
-      const data = await finnhubCandle(ticker, '60', from, now, key, false);
-      if (!data || data.length === 0) return null;
-      // Determine today's date string in ET
-      const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const todayStr = `${et.getFullYear()}-${String(et.getMonth()+1).padStart(2,'0')}-${String(et.getDate()).padStart(2,'0')}`;
-      points = data.filter(p => p.date === todayStr);
-      if (points.length === 0) return null;
-      openPrice = points[0].price;
-
-    } else if (period === '1W') {
-      // 60-min candles; go back 10 calendar days to ensure 5 trading days
-      const from = calendarDaysBackUnix(10);
-      const data = await finnhubCandle(ticker, '60', from, now, key, false);
-      if (!data || data.length === 0) return null;
-      // Keep last 5 trading days
-      const days = [...new Set(data.map(p => p.date))].sort().slice(-5);
-      points = data.filter(p => days.includes(p.date));
-      if (points.length === 0) return null;
-      openPrice = points[0].price;
-
-    } else if (period === '1M') {
-      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(38), now, key, true);
-      if (!data || data.length === 0) return null;
-      points = data.slice(-23); isOHLC = true;
-      openPrice = points[0].open ?? points[0].price;
-
-    } else if (period === '3M') {
-      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(100), now, key, true);
-      if (!data || data.length === 0) return null;
-      points = data.slice(-66); isOHLC = true;
-      openPrice = points[0].open ?? points[0].price;
-
-    } else if (period === '6M') {
-      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(200), now, key, true);
-      if (!data || data.length === 0) return null;
-      points = data.slice(-130); isOHLC = true;
-      openPrice = points[0].open ?? points[0].price;
-
-    } else if (period === '1Y') {
-      const data = await finnhubCandle(ticker, 'D', calendarDaysBackUnix(375), now, key, true);
-      if (!data || data.length === 0) return null;
-      points = data.slice(-252); isOHLC = true;
-      openPrice = points[0].open ?? points[0].price;
-
-    } else { // 5Y
-      const data = await finnhubCandle(ticker, 'W', calendarDaysBackUnix(1900), now, key, true);
-      if (!data || data.length === 0) return null;
-      points = data.slice(-260); isOHLC = true;
-      openPrice = points[0].open ?? points[0].price;
-    }
-
-    if (!points || points.length < 2) return null;
-    const result = { points, isOHLC, openPrice, fetchedAt: Date.now() };
-    _chartCache[cacheKey] = result;
-    return result;
-  } catch(e) {
-    console.error('fetchHistoricalPrices', e);
-    return null;
-  }
-}
-
-async function loadChart(ticker, period, btnEl) {
-  chartPeriod = period;
-  // Update active button
-  document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.remove('active'));
-  if (btnEl) btnEl.classList.add('active');
-  else {
-    const btns = document.querySelectorAll('.chart-period-btn');
-    btns.forEach(b => { if (b.textContent === period) b.classList.add('active'); });
-  }
-
-  // Reset header
-  const hoverPrice = document.getElementById('chart-hover-price');
-  const hoverChange = document.getElementById('chart-hover-change');
-  const currentPrice = state.prices[ticker]?.price;
-  if (hoverPrice) hoverPrice.textContent = currentPrice ? fmt$(currentPrice) : '—';
-  if (hoverChange) { hoverChange.textContent = ''; hoverChange.className = 'chart-change-label'; }
-
-  // Show loading state on canvas
-  const canvas = document.getElementById('chart-canvas');
-  if (canvas) {
-    const dpr = window.devicePixelRatio || 1;
-    const W = canvas.parentElement.clientWidth || 300;
-    const H = 180;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.fillStyle = '#9b9b93';
-    ctx.font = "12px 'DM Sans', sans-serif";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Loading…', W / 2, H / 2);
-  }
-
-  const result = await fetchHistoricalPrices(ticker, period);
-  chartData = result ? result.points : null;
-
-  if (!result || !result.points || result.points.length < 2) {
-    if (canvas) {
-      const dpr = window.devicePixelRatio || 1;
-      const W = canvas.parentElement.clientWidth || 300;
-      const H = 180;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-      const ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#9b9b93';
-      ctx.font = "13px 'DM Sans', sans-serif";
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (period === '1D') {
-        ctx.fillText('No trading data today yet', W / 2, H / 2 - 9);
-        ctx.font = "11px 'DM Sans', sans-serif";
-        ctx.fillText('Market may be closed · try 1W', W / 2, H / 2 + 11);
-      } else {
-        ctx.fillText('No data available', W / 2, H / 2);
-      }
-      if (hoverPrice) hoverPrice.textContent = currentPrice ? fmt$(currentPrice) : '—';
-    }
-    return;
-  }
-
-  drawChart(result.points, result.isOHLC, result.openPrice);
-}
-
-function drawChart(data, isOHLC, openPrice) {
-  const canvas = document.getElementById('chart-canvas');
-  if (!canvas || !data || data.length < 2) return;
-
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.parentElement.clientWidth || 320;
-  const H = 180;
-  canvas.width  = W * dpr; canvas.height  = H * dpr;
-  canvas.style.width  = W + 'px'; canvas.style.height = H + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, W, H);
-
-  const prices = data.map(d => d.price);
-  const allPrices = isOHLC
-    ? [...data.map(d => d.low ?? d.price), ...data.map(d => d.high ?? d.price)]
-    : prices;
-
-  const rawMin = Math.min(...allPrices);
-  const rawMax = Math.max(...allPrices);
-  const rawRange = rawMax - rawMin || rawMax * 0.02 || 1;
-  const niceMin = rawMin - rawRange * 0.1;
-  const niceMax = rawMax + rawRange * 0.1;
-  const niceRange = niceMax - niceMin;
-
-  const pad = { top: 8, right: 16, bottom: 32, left: 56 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-
-  const toX = i => pad.left + (i / Math.max(data.length - 1, 1)) * cw;
-  const toY = v => pad.top + ch - ((v - niceMin) / niceRange) * ch;
-
-  // Color: up = green, down = red relative to open price (or first point)
-  const ref = openPrice ?? prices[0];
-  const lastPrice = prices[prices.length - 1];
-  const isUp = lastPrice >= ref;
-  const lineColor = isUp ? '#1a9e5c' : '#d63b3b';
-  const upColor   = '#1a9e5c';
-  const downColor = '#d63b3b';
-  const gridColor = 'rgba(0,0,0,0.05)';
-  const labelColor = '#a0a09a';
-
-  // Update hover header
-  const hoverPrice = document.getElementById('chart-hover-price');
-  const hoverChange = document.getElementById('chart-hover-change');
-  if (hoverPrice) hoverPrice.textContent = fmt$(lastPrice);
-  if (hoverChange && ref > 0) {
-    const chg = lastPrice - ref;
-    const chgPct = (chg / ref) * 100;
-    hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
-    hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
-  }
-
-  // ── Y axis grid & labels ──
-  ctx.font = `10px 'DM Mono', monospace`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i <= 4; i++) {
-    const v = niceMin + (niceRange * i / 4);
-    const y = toY(v);
-    ctx.beginPath(); ctx.moveTo(pad.left - 2, y); ctx.lineTo(W - pad.right, y);
-    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = labelColor;
-    const lbl = v >= 1000 ? '$' + (v/1000).toFixed(1) + 'k' : '$' + v.toFixed(v < 10 ? 2 : 0);
-    ctx.fillText(lbl, pad.left - 5, y);
-  }
-
-  // ── Baseline ──
-  ctx.beginPath(); ctx.moveTo(pad.left, H - pad.bottom); ctx.lineTo(W - pad.right, H - pad.bottom);
-  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
-
-  // ── X axis labels ──
-  const spanDays = [...new Set(data.map(d => d.date))].length;
-  const isIntraday = spanDays <= 5 && !isOHLC;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  const xTickCount = Math.min(5, data.length);
-  const xStep = Math.max(1, Math.floor((data.length - 1) / (xTickCount - 1)));
-  const drawnX = [];
-  for (let i = 0; i < data.length; i += xStep) {
-    const x = toX(i);
-    if (drawnX.some(px => Math.abs(px - x) < 38)) continue;
-    drawnX.push(x);
-    let lbl;
-    if (isIntraday && data[i].time) {
-      const et = new Date(new Date(data[i].time * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      // Show day name at start of each day in 1W mode
-      if (spanDays > 1 && (i === 0 || (i > 0 && data[i].date !== data[i-1].date))) {
-        lbl = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][et.getDay()];
-      } else {
-        const h = et.getHours(), m = et.getMinutes();
-        lbl = (h > 12 ? h-12 : h||12) + (m ? ':'+String(m).padStart(2,'0') : '') + (h>=12?'p':'a');
-      }
-    } else {
-      const d = new Date(data[i].date + 'T12:00:00Z');
-      lbl = spanDays <= 270
-        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        : d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    }
-    ctx.fillStyle = labelColor;
-    ctx.fillText(lbl, x, H - pad.bottom + 5);
-  }
-
-  // ── Open/baseline reference line ──
-  if (ref > 0 && ref > niceMin && ref < niceMax) {
-    const ry = toY(ref);
-    ctx.save();
-    ctx.setLineDash([3, 4]);
-    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(W - pad.right, ry);
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.restore();
-  }
-
-  if (isOHLC) {
-    // ── OHLC candlestick bars ──
-    const totalBars = data.length;
-    const barSlot = cw / totalBars;
-    const barW = Math.max(1.5, Math.min(barSlot * 0.65, 10));
-    for (let i = 0; i < data.length; i++) {
-      const d = data[i];
-      const x = toX(i);
-      const open  = d.open  ?? d.price;
-      const close = d.close ?? d.price;
-      const high  = d.high  ?? d.price;
-      const low   = d.low   ?? d.price;
-      const color = close >= open ? upColor : downColor;
-      // Wick
-      ctx.beginPath(); ctx.moveTo(x, toY(high)); ctx.lineTo(x, toY(low));
-      ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
-      // Body
-      const bTop = toY(Math.max(open, close));
-      const bBot = toY(Math.min(open, close));
-      ctx.fillStyle = color;
-      ctx.fillRect(x - barW / 2, bTop, barW, Math.max(1, bBot - bTop));
-    }
-
-  } else {
-    // ── Line chart ──
-    // Day separators on 1W
-    if (spanDays > 1) {
-      let prev = data[0].date;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i].date !== prev) {
-          ctx.save(); ctx.setLineDash([3, 3]);
-          ctx.beginPath(); ctx.moveTo(toX(i), pad.top); ctx.lineTo(toX(i), H - pad.bottom);
-          ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1; ctx.stroke();
-          ctx.restore();
-          prev = data[i].date;
-        }
-      }
-    }
-    // Gradient fill
-    const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
-    grad.addColorStop(0, isUp ? 'rgba(26,158,92,0.13)' : 'rgba(214,59,59,0.13)');
-    grad.addColorStop(1, isUp ? 'rgba(26,158,92,0.01)' : 'rgba(214,59,59,0.01)');
-    ctx.beginPath();
-    ctx.moveTo(toX(0), toY(prices[0]));
-    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-    ctx.lineTo(toX(data.length-1), H - pad.bottom);
-    ctx.lineTo(toX(0), H - pad.bottom);
-    ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-    // Line
-    ctx.beginPath();
-    ctx.moveTo(toX(0), toY(prices[0]));
-    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(prices[i]));
-    ctx.strokeStyle = lineColor; ctx.lineWidth = 2;
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
-    // End dot
-    ctx.beginPath(); ctx.arc(toX(data.length-1), toY(lastPrice), 3.5, 0, Math.PI*2);
-    ctx.fillStyle = lineColor; ctx.fill();
-  }
-
-  // ── Hover / touch crosshair ──
-  const cleanImg = canvas.toDataURL();
-
-  function drawCrosshair(idx) {
-    const x = toX(idx);
-    const pt = data[idx];
-    const p0 = pt.price;
-    ctx.save();
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom);
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.restore();
-    if (!isOHLC) {
-      ctx.beginPath(); ctx.arc(x, toY(p0), 5, 0, Math.PI*2);
-      ctx.fillStyle = lineColor; ctx.fill();
-      ctx.beginPath(); ctx.arc(x, toY(p0), 3, 0, Math.PI*2);
-      ctx.fillStyle = '#fff'; ctx.fill();
-    }
-    // Update header display
-    if (hoverPrice) hoverPrice.textContent = fmt$(p0);
-    if (hoverChange && ref > 0) {
-      const chg = p0 - ref;
-      const chgPct = (chg / ref) * 100;
-      hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
-      hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
-    }
-  }
-
-  canvas.ontouchmove = canvas.onmousemove = (e) => {
-    e.preventDefault();
-    const bounds = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const x = clientX - bounds.left;
-    const idx = Math.max(0, Math.min(data.length-1, Math.round(((x - pad.left) / cw) * (data.length-1))));
-    const img = new Image();
-    img.onload = () => { ctx.clearRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H); drawCrosshair(idx); };
-    img.src = cleanImg;
-  };
-  canvas.ontouchend = canvas.onmouseleave = () => {
-    // Restore to current price on leave
-    if (hoverPrice) hoverPrice.textContent = fmt$(lastPrice);
-    if (hoverChange && ref > 0) {
-      const chg = lastPrice - ref;
-      const chgPct = (chg / ref) * 100;
-      hoverChange.textContent = `${chg >= 0 ? '+' : ''}${fmt$(chg)} (${fmtPct(chgPct)})`;
-      hoverChange.className = 'chart-change-label ' + (chg >= 0 ? 'positive' : 'negative');
-    }
-  };
-}
-
 async function refreshAllPrices() {
   const tickers = [...new Set(state.transactions.map(t => t.ticker))];
   if (!tickers.length) { showToast('No stocks to refresh', 'error'); return; }
   if (!state.settings.apiKey) { showToast('Add API key in Settings first', 'error'); return; }
-
-  // Clear chart cache so charts fetch fresh data
-  Object.keys(_chartCache).forEach(k => delete _chartCache[k]);
 
   // Check if per-minute rate limit was recently hit
   if (wasRateLimitedToday()) {
@@ -3345,7 +2791,7 @@ async function renderDetail(ticker) {
   const h = holdings.find(x => x.ticker === ticker);
   const p = state.prices[ticker];
 
-  // Header
+  // ── Header ──
   const header = document.getElementById('detail-header');
   const price = p?.price;
   const changeAmt = p?.change1d;
@@ -3365,7 +2811,7 @@ async function renderDetail(ticker) {
     </div>
   `;
 
-  // Prominent price comparison bar (only when holding)
+  // ── Price vs cost bar ──
   let priceBarEl = document.getElementById('detail-price-bar');
   if (!priceBarEl) {
     priceBarEl = document.createElement('div');
@@ -3391,18 +2837,12 @@ async function renderDetail(ticker) {
     priceBarEl.innerHTML = '';
   }
 
-  // KPIs
+  // ── KPI grid ──
   const kpiEl = document.getElementById('detail-kpis');
   if (h) {
     kpiEl.innerHTML = `
-      <div class="kpi-card">
-        <div class="kpi-label">Current Value</div>
-        <div class="kpi-value">${h.currentValue != null ? fmt$(h.currentValue) : '—'}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Invested</div>
-        <div class="kpi-value">${fmt$(h.costBasis)}</div>
-      </div>
+      <div class="kpi-card"><div class="kpi-label">Current Value</div><div class="kpi-value">${h.currentValue != null ? fmt$(h.currentValue) : '—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Invested</div><div class="kpi-value">${fmt$(h.costBasis)}</div></div>
       <div class="kpi-card">
         <div class="kpi-label">Unrealized P&L</div>
         <div class="kpi-value ${signClass(h.unrealized)}">${h.unrealized != null ? (h.unrealized>=0?'+':'')+fmt$(h.unrealized) : '—'}</div>
@@ -3417,27 +2857,23 @@ async function renderDetail(ticker) {
     kpiEl.innerHTML = '<div class="kpi-card full"><div class="kpi-label">Not in current holdings</div></div>';
   }
 
-  // Chart period buttons
-  const periods = ['1D','1W','1M','3M','6M','1Y','5Y'];
-  document.getElementById('chart-periods').innerHTML = periods.map(p =>
-    `<button class="chart-period-btn ${p===chartPeriod?'active':''}" onclick="loadChart('${ticker}','${p}',this)">${p}</button>`
-  ).join('');
+  // ── Price change table (async, fills in period data as it arrives) ──
+  renderDetailPriceTable(ticker);
 
-  // Load chart
-  await loadChart(ticker, chartPeriod);
+  // ── Analyst ratings ──
+  renderDetailAnalyst(ticker);
 
-  // Stock info card — only show fields available from Finnhub
+  // ── Stock info card ──
   const infoCard = document.getElementById('detail-info-card');
   const infoRows = [];
-  if (p?.open)  infoRows.push(['Open',     fmt$(p.open)]);
-  if (p?.high)  infoRows.push(['Day High', fmt$(p.high)]);
-  if (p?.low)   infoRows.push(['Day Low',  fmt$(p.low)]);
+  if (p?.open)      infoRows.push(['Open',       fmt$(p.open)]);
+  if (p?.high)      infoRows.push(['Day High',   fmt$(p.high)]);
+  if (p?.low)       infoRows.push(['Day Low',    fmt$(p.low)]);
   if (p?.prevClose) infoRows.push(['Prev Close', fmt$(p.prevClose)]);
-  // 52W and market cap come from company profile — show if cached
-  if (p?.week52H) infoRows.push(['52W High',   fmt$(p.week52H)]);
-  if (p?.week52L) infoRows.push(['52W Low',    fmt$(p.week52L)]);
-  if (p?.mktCap)  infoRows.push(['Market Cap', fmt$K(p.mktCap)]);
-  if (p?.pe)      infoRows.push(['P/E Ratio',  fmtNum(p.pe, 2)]);
+  if (p?.week52H)   infoRows.push(['52W High',   fmt$(p.week52H)]);
+  if (p?.week52L)   infoRows.push(['52W Low',    fmt$(p.week52L)]);
+  if (p?.mktCap)    infoRows.push(['Market Cap', fmt$K(p.mktCap)]);
+  if (p?.pe)        infoRows.push(['P/E Ratio',  fmtNum(p.pe, 2)]);
   if (h) {
     infoRows.push(['Shares Held', fmtNum(h.shares, 6)]);
     infoRows.push(['Cost Basis',  fmt$(h.costBasis)]);
@@ -3449,19 +2885,125 @@ async function renderDetail(ticker) {
       ).join('')
     : '<div class="detail-info-row"><span class="detail-info-label" style="color:var(--text3)">No additional data available</span></div>';
 
-  // Fetch company profile for 52W/market cap if not yet cached
-  if (state.settings.apiKey && p && (!p.week52H || !p.mktCap)) {
-    fetchCompanyProfile(ticker);
-  }
+  if (state.settings.apiKey && p && (!p.week52H || !p.mktCap)) fetchCompanyProfile(ticker);
 
-  // Long-term / Short-term breakdown
+  // ── LT/ST breakdown ──
   renderLtStBreakdown(ticker, h);
 
-  // Transactions for this ticker
+  // ── Transactions ──
   renderDetailTransactions(ticker);
+}
 
-  // Stock news section (async, non-blocking)
-  renderStockNews(ticker);
+// ── Price Change Table ────────────────────────────────────────────────────────
+async function renderDetailPriceTable(ticker) {
+  const el = document.getElementById('detail-price-table');
+  if (!el) return;
+  const p = state.prices[ticker];
+  const key = state.settings.apiKey;
+
+  if (!p?.price) {
+    el.innerHTML = `<table class="price-table"><tbody>
+      <tr><td colspan="4" style="text-align:center;padding:14px;color:var(--text3);font-size:13px;font-family:var(--font)">
+        Refresh prices to see performance data
+      </td></tr></tbody></table>`;
+    return;
+  }
+
+  // Show skeleton immediately
+  el.innerHTML = `<table class="price-table">
+    <thead><tr><th>Period</th><th>Start Price</th><th>Change $</th><th>Change %</th></tr></thead>
+    <tbody><tr><td colspan="4" style="text-align:center;padding:14px;color:var(--text3);font-size:12px;font-family:var(--font)">Loading…</td></tr></tbody>
+  </table>`;
+
+  const periods = [
+    { label: 'Today',   id: '1d',  days: null },
+    { label: '1 Week',  id: '1w',  days: 9    },
+    { label: '1 Month', id: '1m',  days: 35   },
+    { label: '3 Month', id: '3m',  days: 100  },
+    { label: '6 Month', id: '6m',  days: 200  },
+    { label: '1 Year',  id: '1y',  days: 375  },
+  ];
+
+  // Fetch missing snaps in parallel
+  if (key) {
+    await Promise.all(
+      periods
+        .filter(pd => pd.days !== null && !(p.periodSnaps?.[pd.id]))
+        .map(pd => fetchPeriodChange(ticker, pd.id))
+    );
+  }
+
+  const rows = periods.map(pd => {
+    const chg = getPriceChange(ticker, pd.id);
+    if (!chg) {
+      return `<tr>
+        <td>${pd.label}</td>
+        <td class="tbl-na">—</td><td class="tbl-na">—</td><td class="tbl-na">—</td>
+      </tr>`;
+    }
+    const start = p.price - chg.amt;
+    const cls = signClass(chg.amt);
+    const sign = chg.amt >= 0 ? '+' : '';
+    return `<tr>
+      <td>${pd.label}</td>
+      <td>${fmt$(start)}</td>
+      <td class="${cls}">${sign}${fmt$(chg.amt)}</td>
+      <td class="${cls}">${sign}${fmtPct(chg.pct)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table class="price-table">
+    <thead><tr><th>Period</th><th>Start Price</th><th>Change $</th><th>Change %</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Analyst Ratings (detail page) ────────────────────────────────────────────
+async function renderDetailAnalyst(ticker) {
+  const el = document.getElementById('detail-analyst');
+  if (!el) return;
+  const key = state.settings.apiKey;
+  if (!key) { el.innerHTML = '<div style="color:var(--text3);font-size:13px">Add API key in Settings to see ratings</div>'; return; }
+  el.innerHTML = '<div style="color:var(--text3);font-size:13px">Loading…</div>';
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${ticker}&token=${key}`);
+    const data = await r.json();
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = '<div style="color:var(--text3);font-size:13px">No analyst data available</div>';
+      return;
+    }
+    el.innerHTML = buildAnalystHTML(data[0]);
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px">Failed to load analyst data</div>';
+  }
+}
+
+function buildAnalystHTML(rec) {
+  const total = (rec.strongBuy||0)+(rec.buy||0)+(rec.hold||0)+(rec.sell||0)+(rec.strongSell||0);
+  if (!total) return '<div style="color:var(--text3);font-size:13px">No analyst data</div>';
+  const bullish = (rec.strongBuy||0)+(rec.buy||0);
+  const bearish  = (rec.sell||0)+(rec.strongSell||0);
+  let consensus = 'Hold', cColor = '#f59e0b';
+  if (bullish/total >= 0.5) { consensus = 'Buy'; cColor = '#1a9e5c'; }
+  else if (bearish/total >= 0.5) { consensus = 'Sell'; cColor = '#d63b3b'; }
+  const bars = [
+    { label:'Strong Buy',  val:rec.strongBuy||0,  color:'#1a9e5c' },
+    { label:'Buy',         val:rec.buy||0,         color:'#4caf50' },
+    { label:'Hold',        val:rec.hold||0,        color:'#f59e0b' },
+    { label:'Sell',        val:rec.sell||0,        color:'#f97316' },
+    { label:'Strong Sell', val:rec.strongSell||0,  color:'#d63b3b' },
+  ];
+  return `<div class="analyst-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <span style="font-size:12px;color:var(--text2)">${total} analysts${rec.period ? ' · '+rec.period : ''}</span>
+      <span style="font-size:14px;font-weight:700;color:${cColor}">${consensus}</span>
+    </div>
+    ${bars.map(b=>`<div class="analyst-row">
+      <div class="analyst-lbl">${b.label}</div>
+      <div class="analyst-track"><div class="analyst-fill" style="width:${(b.val/total*100).toFixed(1)}%;background:${b.color}"></div></div>
+      <div class="analyst-cnt">${b.val}</div>
+    </div>`).join('')}
+  </div>`;
 }
 
 function renderLtStBreakdown(ticker, holding) {
@@ -3724,27 +3266,27 @@ function buildTxCard(tx, showEdit=false) {
 // ═══════════════════════════════════════════════════════════════
 // RENDER NEWS
 // ═══════════════════════════════════════════════════════════════
-// ─── News helpers ────────────────────────────────────────────────────────────
+
 function newsTimeAgo(unixSec) {
-  const diff = Math.floor(Date.now() / 1000) - unixSec;
-  if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
+  const diff = Math.floor(Date.now()/1000) - unixSec;
+  if (diff < 3600)  return Math.floor(diff/60)+'m ago';
+  if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
 }
 
-function newsArticleCard(article) {
-  const headline = (article.headline || article.summary || 'No headline').slice(0, 120);
-  const source = article.source || '';
-  const time = article.datetime ? newsTimeAgo(article.datetime) : '';
-  const img = article.image || '';
-  const url = article.url || '#';
-  return `<div class="news-article-card">
-    <a href="${url}" target="_blank" rel="noopener" class="news-article-inner">
+function newsCard(a) {
+  const headline = (a.headline || a.summary || '').slice(0,140);
+  const url = a.url || '#';
+  const img = a.image || '';
+  const src = a.source || '';
+  const time = a.datetime ? newsTimeAgo(a.datetime) : '';
+  return `<div class="news-card">
+    <a href="${url}" target="_blank" rel="noopener">
       ${img ? `<img class="news-thumb" src="${img}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
       <div class="news-body">
         <div class="news-headline">${headline}</div>
         <div class="news-meta">
-          ${source ? `<span class="news-source-badge">${source}</span>` : ''}
+          ${src ? `<span class="news-source">${src}</span>` : ''}
           ${time ? `<span>${time}</span>` : ''}
         </div>
       </div>
@@ -3752,392 +3294,240 @@ function newsArticleCard(article) {
   </div>`;
 }
 
-function sectionWrap(title, html) {
-  return `<div class="news-section-title">${title}</div>
-    <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 4px">${html}</div>`;
+function secHdr(title) {
+  return `<div class="news-sec-hdr">${title}</div>`;
 }
 
-function infoCard(content) {
-  return `<div style="margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">${content}</div>`;
+function cardWrap(html) {
+  return `<div style="margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">${html}</div>`;
 }
 
-// ─── News Tab ─────────────────────────────────────────────────────────────────
 async function renderNews() {
-  const container = document.getElementById('news-tab-container');
+  const container = document.getElementById('news-container');
   if (!container) return;
   const key = state.settings.apiKey;
+
   if (!key) {
-    container.innerHTML = `<div class="empty-state" style="padding:40px 20px">
-      <div class="icon">🔑</div><h3>API Key Required</h3>
-      <p>Add your Finnhub API key in Settings to see market intelligence</p>
+    container.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:12px">🔑</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px">API Key Required</div>
+      <div style="font-size:13px">Add your Finnhub API key in Settings to see market intelligence</div>
     </div>`;
     return;
   }
-  container.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">Loading market data…</div>`;
+
+  container.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:13px">Loading market data…</div>`;
 
   const tickers = [...new Set(state.transactions.map(t => t.ticker))];
   const sections = [];
 
-  // ── 1. PORTFOLIO SNAPSHOT ─────────────────────────────────────
+  // ── 1. PORTFOLIO SNAPSHOT ─────────────────────────────────
   const holdings = getHoldings().filter(h => h.shares > 0);
   if (holdings.length) {
-    const totalVal  = holdings.reduce((s,h) => s + (h.currentValue || 0), 0);
-    const totalCost = holdings.reduce((s,h) => s + h.costBasis, 0);
+    const totalVal  = holdings.reduce((s,h)=>s+(h.currentValue||0),0);
+    const totalCost = holdings.reduce((s,h)=>s+h.costBasis,0);
     const totalPnl  = totalVal - totalCost;
-    const pnlPct    = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
-    const cards = holdings.map(h => {
-      const chg1d = state.prices[h.ticker]?.change1d;
-      const chgPct = state.prices[h.ticker]?.changePct1d;
-      const sign = chg1d != null ? (chg1d >= 0 ? 'positive' : 'negative') : '';
-      return `<div class="metric-card" style="cursor:pointer" onclick="navigate('detail','${h.ticker}')">
-        <div class="metric-label">${h.ticker}</div>
-        <div class="metric-val">${h.currentValue != null ? fmt$(h.currentValue) : '—'}</div>
-        <div class="metric-sub ${sign}">${chg1d != null ? (chg1d>=0?'+':'')+fmt$(chg1d)+' today' : (h.unrealizedPct != null ? fmtPct(h.unrealizedPct)+' total' : '—')}</div>
+    const pnlPct    = totalCost>0 ? totalPnl/totalCost*100 : 0;
+
+    const tiles = holdings.map(h => {
+      const chg = state.prices[h.ticker]?.change1d;
+      const cls = chg != null ? signClass(chg) : '';
+      return `<div style="flex:1;min-width:0;padding:10px 12px;border-right:1px solid var(--border);cursor:pointer" onclick="navigate('detail','${h.ticker}')">
+        <div style="font-size:11px;font-weight:700;color:var(--text2)">${h.ticker}</div>
+        <div style="font-size:14px;font-weight:700;font-family:var(--mono);margin-top:2px">${h.currentValue!=null?fmt$(h.currentValue):'—'}</div>
+        <div style="font-size:11px;margin-top:1px" class="${cls}">${chg!=null?(chg>=0?'+':'')+fmt$(chg)+' today':'—'}</div>
       </div>`;
     }).join('');
-    sections.push(`<div class="news-section-title">📊 Portfolio Today</div>
-      <div class="metric-grid">${cards}</div>
-      ${infoCard(`<div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total Value</div>
-          <div style="font-size:20px;font-weight:700;font-family:var(--mono)">${fmt$(totalVal)}</div></div>
-        <div style="text-align:right"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total P&amp;L</div>
-          <div style="font-size:20px;font-weight:700;font-family:var(--mono);${totalPnl>=0?'color:var(--green)':'color:var(--red)'}">${totalPnl>=0?'+':''}${fmt$(totalPnl)}</div>
-          <div style="font-size:12px;${totalPnl>=0?'color:var(--green)':'color:var(--red)'}">${fmtPct(pnlPct)}</div>
+
+    sections.push(secHdr('📊 Portfolio'));
+    sections.push(cardWrap(`
+      <div style="display:flex;overflow-x:auto;border-bottom:1px solid var(--border)">${tiles}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
+        <div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total Value</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono)">${fmt$(totalVal)}</div>
         </div>
-      </div>`)}`);
+        <div style="text-align:right">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total P&L</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono)" class="${signClass(totalPnl)}">${totalPnl>=0?'+':''}${fmt$(totalPnl)}</div>
+          <div style="font-size:12px" class="${signClass(totalPnl)}">${fmtPct(pnlPct)}</div>
+        </div>
+      </div>`));
   }
 
-  // ── 2. MARKET NEWS ────────────────────────────────────────────
-  try {
-    const r = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${key}`);
-    const articles = await r.json();
-    if (Array.isArray(articles) && articles.length) {
-      const top = articles.slice(0, 8);
-      sections.push(sectionWrap('🌍 Market Headlines', top.map(newsArticleCard).join('')));
-    }
-  } catch(e) {}
-
-  // ── 3. ANALYST RECOMMENDATIONS for each holding ───────────────
-  const recPromises = tickers.slice(0, 4).map(async ticker => {
+  // ── 2. ANALYST RATINGS (all holdings) ─────────────────────
+  const recResults = await Promise.all(tickers.map(async ticker => {
     try {
       const r = await fetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${ticker}&token=${key}`);
       const data = await r.json();
       if (!Array.isArray(data) || !data.length) return null;
-      const latest = data[0]; // most recent month
-      const total = (latest.strongBuy||0)+(latest.buy||0)+(latest.hold||0)+(latest.sell||0)+(latest.strongSell||0);
-      if (!total) return null;
-      const bars = [
-        { label: 'Strong Buy', val: latest.strongBuy||0, color: '#1a9e5c' },
-        { label: 'Buy',        val: latest.buy||0,        color: '#4caf50' },
-        { label: 'Hold',       val: latest.hold||0,       color: '#f59e0b' },
-        { label: 'Sell',       val: latest.sell||0,       color: '#f97316' },
-        { label: 'Strong Sell',val: latest.strongSell||0, color: '#d63b3b' },
-      ];
-      return `<div class="analyst-bar-wrap">
-        <div style="font-size:13px;font-weight:700;margin-bottom:10px">${ticker} — Analyst Ratings <span style="font-size:11px;font-weight:400;color:var(--text3)">${latest.period || ''}</span></div>
-        ${bars.map(b => `<div class="analyst-bar-row">
-          <div class="analyst-bar-label">${b.label}</div>
-          <div class="analyst-bar-track"><div class="analyst-bar-fill" style="width:${(b.val/total*100).toFixed(1)}%;background:${b.color}"></div></div>
-          <div class="analyst-bar-count">${b.val}</div>
-        </div>`).join('')}
-        <div style="font-size:11px;color:var(--text3);margin-top:6px">${total} analysts</div>
-      </div>`;
+      return { ticker, rec: data[0] };
     } catch(e) { return null; }
-  });
-  const recResults = (await Promise.all(recPromises)).filter(Boolean);
-  if (recResults.length) sections.push(`<div class="news-section-title">📈 Analyst Ratings</div>${recResults.join('')}`);
+  }));
+  const validRecs = recResults.filter(Boolean);
+  if (validRecs.length) {
+    sections.push(secHdr('📈 Analyst Ratings'));
+    for (const { ticker, rec } of validRecs) {
+      const total = (rec.strongBuy||0)+(rec.buy||0)+(rec.hold||0)+(rec.sell||0)+(rec.strongSell||0);
+      if (!total) continue;
+      const bullish = (rec.strongBuy||0)+(rec.buy||0);
+      const bearish = (rec.sell||0)+(rec.strongSell||0);
+      let consensus='Hold', cColor='#f59e0b';
+      if (bullish/total>=0.5){consensus='Buy';cColor='#1a9e5c';}
+      else if(bearish/total>=0.5){consensus='Sell';cColor='#d63b3b';}
+      const bars=[
+        {label:'Strong Buy', val:rec.strongBuy||0, color:'#1a9e5c'},
+        {label:'Buy',        val:rec.buy||0,        color:'#4caf50'},
+        {label:'Hold',       val:rec.hold||0,       color:'#f59e0b'},
+        {label:'Sell',       val:rec.sell||0,       color:'#f97316'},
+        {label:'Strong Sell',val:rec.strongSell||0, color:'#d63b3b'},
+      ];
+      sections.push(cardWrap(`
+        <div style="padding:12px 14px 10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+            <span style="font-size:14px;font-weight:700;cursor:pointer" onclick="navigate('detail','${ticker}')">${ticker}</span>
+            <span style="font-size:11px;color:var(--text3)">${total} analysts${rec.period?' · '+rec.period:''}</span>
+            <span style="font-size:13px;font-weight:700;color:${cColor}">${consensus}</span>
+          </div>
+          ${bars.map(b=>`<div class="analyst-row">
+            <div class="analyst-lbl">${b.label}</div>
+            <div class="analyst-track"><div class="analyst-fill" style="width:${(b.val/total*100).toFixed(1)}%;background:${b.color}"></div></div>
+            <div class="analyst-cnt">${b.val}</div>
+          </div>`).join('')}
+        </div>`));
+    }
+  }
 
-  // ── 4. PRICE TARGETS ─────────────────────────────────────────
-  const ptPromises = tickers.slice(0, 4).map(async ticker => {
+  // ── 3. PRICE TARGETS ─────────────────────────────────────
+  const ptResults = await Promise.all(tickers.map(async ticker => {
     try {
       const r = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${key}`);
       const d = await r.json();
-      if (!d || !d.targetMean) return null;
-      const price = state.prices[ticker]?.price;
-      const updown = price && d.targetMean ? ((d.targetMean - price) / price * 100).toFixed(1) : null;
-      return `<div class="metric-card" style="grid-column:span 1">
-        <div class="metric-label">${ticker} — Price Target</div>
-        <div class="metric-val">${fmt$(d.targetMean)}</div>
-        <div class="metric-sub">High: ${fmt$(d.targetHigh)} · Low: ${fmt$(d.targetLow)}</div>
-        ${updown ? `<div class="metric-sub ${parseFloat(updown)>=0?'positive':'negative'}">${parseFloat(updown)>=0?'+':''}${updown}% from current</div>` : ''}
-      </div>`;
+      if (!d?.targetMean) return null;
+      return { ticker, d };
     } catch(e) { return null; }
-  });
-  const ptResults = (await Promise.all(ptPromises)).filter(Boolean);
-  if (ptResults.length) sections.push(`<div class="news-section-title">🎯 Price Targets</div><div class="metric-grid" style="padding:0 16px 4px">${ptResults.join('')}</div>`);
+  }));
+  const validPT = ptResults.filter(Boolean);
+  if (validPT.length) {
+    sections.push(secHdr('🎯 Price Targets'));
+    const ptTiles = validPT.map(({ticker, d}) => {
+      const price = state.prices[ticker]?.price;
+      const updown = price && d.targetMean ? ((d.targetMean-price)/price*100).toFixed(1) : null;
+      const cls = updown ? (parseFloat(updown)>=0?'positive':'negative') : '';
+      return `<div style="flex:1;min-width:140px;padding:12px 14px;border-right:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px;cursor:pointer" onclick="navigate('detail','${ticker}')">${ticker}</div>
+        <div style="font-size:16px;font-weight:700;font-family:var(--mono)">${fmt$(d.targetMean)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Hi ${fmt$(d.targetHigh)} · Lo ${fmt$(d.targetLow)}</div>
+        ${updown?`<div style="font-size:11px;margin-top:2px" class="${cls}">${parseFloat(updown)>=0?'+':''}${updown}% from current</div>`:''}
+      </div>`;
+    }).join('');
+    sections.push(cardWrap(`<div style="display:flex;flex-wrap:wrap">${ptTiles}</div>`));
+  }
 
-  // ── 5. EARNINGS CALENDAR ─────────────────────────────────────
+  // ── 4. UPCOMING EARNINGS ──────────────────────────────────
   try {
-    const now = new Date();
-    const from = now.toISOString().split('T')[0];
-    const to = new Date(Date.now() + 60*86400000).toISOString().split('T')[0];
-    const r = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${key}`);
+    const today = new Date().toISOString().split('T')[0];
+    const future = new Date(Date.now()+60*86400000).toISOString().split('T')[0];
+    const r = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${today}&to=${future}&token=${key}`);
     const d = await r.json();
-    const items = (d.earningsCalendar || [])
-      .filter(e => tickers.includes(e.symbol))
-      .slice(0, 6);
+    const items = (d.earningsCalendar||[]).filter(e=>tickers.includes(e.symbol)).slice(0,6);
     if (items.length) {
-      const rows = items.map(e => {
-        const dt = new Date(e.date + 'T12:00:00Z');
-        return `<div class="calendar-item">
-          <div class="cal-date-box">
-            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
-            <div class="cal-date-day">${dt.getUTCDate()}</div>
+      sections.push(secHdr('📅 Upcoming Earnings'));
+      const rows = items.map(e=>{
+        const dt = new Date(e.date+'T12:00:00Z');
+        return `<div class="cal-item">
+          <div class="cal-datebox">
+            <div class="cal-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
+            <div class="cal-day">${dt.getUTCDate()}</div>
           </div>
           <div class="cal-info">
-            <div class="cal-title">${e.symbol} Earnings</div>
-            <div class="cal-sub">${e.hour === 'bmo' ? 'Before Market Open' : e.hour === 'amc' ? 'After Market Close' : e.hour || ''}
-              ${e.epsEstimate ? ` · EPS est. ${fmt$(e.epsEstimate)}` : ''}
-            </div>
+            <div class="cal-title" style="cursor:pointer" onclick="navigate('detail','${e.symbol}')">${e.symbol} Earnings</div>
+            <div class="cal-sub">${e.hour==='bmo'?'Before Market Open':e.hour==='amc'?'After Market Close':e.hour||''}${e.epsEstimate?` · EPS est. ${fmt$(e.epsEstimate)}`:''}</div>
           </div>
         </div>`;
       }).join('');
-      sections.push(`<div class="news-section-title">📅 Upcoming Earnings</div>${infoCard(rows)}`);
+      sections.push(cardWrap(rows));
     }
-  } catch(e) {}
+  } catch(e){}
 
-  // ── 6. EARNINGS SURPRISES ─────────────────────────────────────
-  const epsPromises = tickers.slice(0, 3).map(async ticker => {
-    try {
-      const r = await fetch(`https://finnhub.io/api/v1/stock/earnings?symbol=${ticker}&limit=4&token=${key}`);
-      const data = await r.json();
-      if (!Array.isArray(data) || !data.length) return null;
-      const rows = data.map(e => {
-        const beat = e.actual != null && e.estimate != null
-          ? (e.actual >= e.estimate ? 'beat' : 'miss') : '';
-        const surprise = e.actual != null && e.estimate != null
-          ? ((e.actual - e.estimate) / Math.abs(e.estimate || 1) * 100).toFixed(1) : null;
-        return `<tr>
-          <td>${e.period || e.date || ''}</td>
-          <td>${e.actual != null ? fmt$(e.actual) : '—'}</td>
-          <td>${e.estimate != null ? fmt$(e.estimate) : '—'}</td>
-          <td class="${beat}">${surprise != null ? (parseFloat(surprise)>=0?'+':'')+surprise+'%' : '—'}</td>
-        </tr>`;
-      }).join('');
-      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
-        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Quarterly EPS</div>
-        <div style="padding:4px 14px 10px;overflow-x:auto">
-          <table class="earnings-table"><thead><tr>
-            <th>Quarter</th><th>Actual</th><th>Estimate</th><th>Surprise</th>
-          </tr></thead><tbody>${rows}</tbody></table>
-        </div>
-      </div>`;
-    } catch(e) { return null; }
-  });
-  const epsResults = (await Promise.all(epsPromises)).filter(Boolean);
-  if (epsResults.length) sections.push(`<div class="news-section-title">📊 Earnings History</div>${epsResults.join('')}`);
-
-  // ── 7. INSIDER TRANSACTIONS ───────────────────────────────────
-  const insiderPromises = tickers.slice(0, 3).map(async ticker => {
-    try {
-      const r = await fetch(`https://finnhub.io/api/v1/stock/insider-transactions?symbol=${ticker}&token=${key}`);
-      const d = await r.json();
-      const txs = (d.data || []).filter(t => t.share && t.share !== 0).slice(0, 5);
-      if (!txs.length) return null;
-      const rows = txs.map(t => {
-        const isBuy = (t.transactionCode === 'P' || (t.share > 0));
-        return `<div class="insider-row">
-          <div class="insider-dot ${isBuy?'buy':'sell'}"></div>
-          <div class="insider-name">${t.name || 'Unknown'}</div>
-          <div>
-            <div class="insider-detail">${isBuy ? '+' : ''}${(t.share||0).toLocaleString()} shares</div>
-            <div class="insider-detail">${t.transactionDate || t.filingDate || ''}</div>
-          </div>
-        </div>`;
-      }).join('');
-      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
-        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Insider Activity</div>
-        ${rows}
-      </div>`;
-    } catch(e) { return null; }
-  });
-  const insiderResults = (await Promise.all(insiderPromises)).filter(Boolean);
-  if (insiderResults.length) sections.push(`<div class="news-section-title">👤 Insider Transactions</div>${insiderResults.join('')}`);
-
-  // ── 8. BASIC FINANCIALS ───────────────────────────────────────
-  const finPromises = tickers.slice(0, 4).map(async ticker => {
-    try {
-      const r = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${key}`);
-      const d = await r.json();
-      const m = d.metric || {};
-      const rows = [
-        ['52W High',      m['52WeekHigh'] != null ? fmt$(m['52WeekHigh']) : null],
-        ['52W Low',       m['52WeekLow']  != null ? fmt$(m['52WeekLow'])  : null],
-        ['P/E (TTM)',     m.peBasicExclExtraTTM != null ? fmtNum(m.peBasicExclExtraTTM,2) : null],
-        ['P/S (TTM)',     m.psTTM != null ? fmtNum(m.psTTM,2) : null],
-        ['P/B',          m.pbAnnual != null ? fmtNum(m.pbAnnual,2) : null],
-        ['EPS (TTM)',     m.epsTTM != null ? fmt$(m.epsTTM) : null],
-        ['Rev/Share',     m.revenuePerShareTTM != null ? fmt$(m.revenuePerShareTTM) : null],
-        ['Beta',         m.beta != null ? fmtNum(m.beta,2) : null],
-        ['Div Yield',    m.dividendYieldIndicatedAnnual != null ? fmtPct(m.dividendYieldIndicatedAnnual) : null],
-        ['ROE (TTM)',    m.roeTTM != null ? fmtPct(m.roeTTM) : null],
-        ['Gross Margin', m.grossMarginTTM != null ? fmtPct(m.grossMarginTTM) : null],
-        ['Debt/Equity',  m.totalDebt_totalEquityAnnual != null ? fmtNum(m.totalDebt_totalEquityAnnual,2) : null],
-      ].filter(([,v]) => v != null);
-      if (!rows.length) return null;
-      return `<div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
-        <div style="padding:10px 14px 8px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">${ticker} — Fundamentals</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;padding:4px 0">
-          ${rows.map(([l,v])=>`<div style="padding:7px 14px;border-bottom:1px solid var(--border);font-size:12px">
-            <div style="color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px">${l}</div>
-            <div style="font-weight:600;font-family:var(--mono)">${v}</div>
-          </div>`).join('')}
-        </div>
-      </div>`;
-    } catch(e) { return null; }
-  });
-  const finResults = (await Promise.all(finPromises)).filter(Boolean);
-  if (finResults.length) sections.push(`<div class="news-section-title">🏦 Fundamentals</div>${finResults.join('')}`);
-
-  // ── 9. NEWS SENTIMENT ─────────────────────────────────────────
-  const sentPromises = tickers.slice(0, 4).map(async ticker => {
+  // ── 5. NEWS SENTIMENT ─────────────────────────────────────
+  const sentResults = await Promise.all(tickers.map(async ticker => {
     try {
       const r = await fetch(`https://finnhub.io/api/v1/news-sentiment?symbol=${ticker}&token=${key}`);
       const d = await r.json();
-      if (!d || d.sentiment == null) return null;
-      const score = d.companyNewsScore ?? d.sentiment?.bearishPercent ?? null;
+      if (!d?.sentiment) return null;
+      return { ticker, d };
+    } catch(e){ return null; }
+  }));
+  const validSent = sentResults.filter(Boolean);
+  if (validSent.length) {
+    sections.push(secHdr('💬 News Sentiment'));
+    const sentTiles = validSent.map(({ticker, d}) => {
+      const bull = d.sentiment?.bullishPercent!=null ? (d.sentiment.bullishPercent*100).toFixed(0) : null;
       const buzz = d.buzz?.articlesInLastWeek ?? d.buzz?.weeklyAverage ?? null;
-      const bull = d.sentiment?.bullishPercent != null ? (d.sentiment.bullishPercent * 100).toFixed(0) : null;
-      const bear = d.sentiment?.bearishPercent != null ? (d.sentiment.bearishPercent * 100).toFixed(0) : null;
-      return `<div class="metric-card">
-        <div class="metric-label">${ticker} Sentiment</div>
-        ${bull ? `<div class="metric-val positive">+${bull}% bullish</div>` : '<div class="metric-val">—</div>'}
-        ${bear ? `<div class="metric-sub negative">${bear}% bearish</div>` : ''}
-        ${buzz ? `<div class="metric-sub">${buzz} articles/wk</div>` : ''}
+      return `<div style="flex:1;min-width:120px;padding:12px 14px;border-right:1px solid var(--border);cursor:pointer" onclick="navigate('detail','${ticker}')">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px">${ticker}</div>
+        ${bull?`<div style="font-size:15px;font-weight:700;font-family:var(--mono)" class="positive">+${bull}% bullish</div>`:'<div style="font-size:13px;color:var(--text3)">—</div>'}
+        ${buzz?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${buzz} articles/wk</div>`:''}
       </div>`;
-    } catch(e) { return null; }
-  });
-  const sentResults = (await Promise.all(sentPromises)).filter(Boolean);
-  if (sentResults.length) sections.push(`<div class="news-section-title">💬 News Sentiment</div><div class="metric-grid" style="padding:0 16px 4px">${sentResults.join('')}</div>`);
+    }).join('');
+    sections.push(cardWrap(`<div style="display:flex;flex-wrap:wrap">${sentTiles}</div>`));
+  }
 
-  // ── 10. IPO CALENDAR ─────────────────────────────────────────
+  // ── 6. UPGRADES & DOWNGRADES ──────────────────────────────
   try {
-    const from = new Date().toISOString().split('T')[0];
-    const to = new Date(Date.now() + 30*86400000).toISOString().split('T')[0];
-    const r = await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${from}&to=${to}&token=${key}`);
-    const d = await r.json();
-    const ipos = (d.ipoCalendar || []).slice(0, 6);
-    if (ipos.length) {
-      const rows = ipos.map(ipo => {
-        const dt = new Date(ipo.date + 'T12:00:00Z');
-        return `<div class="calendar-item">
-          <div class="cal-date-box" style="background:var(--accent-dark,#4f46e5)">
-            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
-            <div class="cal-date-day">${dt.getUTCDate()}</div>
-          </div>
-          <div class="cal-info">
-            <div class="cal-title">${ipo.name || ipo.symbol || 'Unknown'} (${ipo.symbol || ''})</div>
-            <div class="cal-sub">${ipo.exchange || ''} · ${ipo.numberOfShares ? (ipo.numberOfShares/1e6).toFixed(1)+'M shares' : ''}
-              ${ipo.price ? ' · $'+ipo.price : ''}
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-      sections.push(`<div class="news-section-title">🚀 Upcoming IPOs</div>${infoCard(rows)}`);
-    }
-  } catch(e) {}
-
-  // ── 11. ECONOMIC CALENDAR ─────────────────────────────────────
-  try {
-    const r = await fetch(`https://finnhub.io/api/v1/calendar/economic?token=${key}`);
-    const d = await r.json();
-    const events = (d.economicCalendar || [])
-      .filter(e => e.impact === 'high' || e.impact === 'medium')
-      .slice(0, 8);
-    if (events.length) {
-      const rows = events.map(ev => {
-        const dt = new Date(ev.time || (ev.date + 'T12:00:00Z'));
-        return `<div class="calendar-item">
-          <div class="cal-date-box" style="background:${ev.impact==='high'?'#d63b3b':'#f59e0b'}">
-            <div class="cal-date-mon">${dt.toLocaleDateString('en-US',{month:'short'})}</div>
-            <div class="cal-date-day">${dt.getDate()}</div>
-          </div>
-          <div class="cal-info">
-            <div class="cal-title">${ev.event || ev.name || '—'}</div>
-            <div class="cal-sub">${ev.country || ''} · ${ev.impact || ''} impact
-              ${ev.actual != null ? ` · Actual: ${ev.actual}` : ''}
-              ${ev.estimate != null ? ` · Est: ${ev.estimate}` : ''}
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-      sections.push(`<div class="news-section-title">🏛 Economic Calendar</div>${infoCard(rows)}`);
-    }
-  } catch(e) {}
-
-  // ── 12. STOCK UPGRADES / DOWNGRADES ──────────────────────────
-  try {
-    const r = await fetch(`https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${tickers.slice(0,3).join(',')}&token=${key}`);
-    const data = await r.json();
-    const items = Array.isArray(data) ? data.slice(0, 8) : [];
-    if (items.length) {
-      const rows = items.map(u => {
-        const isUp = (u.toGrade || '').toLowerCase().includes('buy') || (u.toGrade||'') > (u.fromGrade||'');
+    const upgradeResults = await Promise.all(tickers.slice(0,4).map(async ticker => {
+      const r = await fetch(`https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${ticker}&token=${key}`);
+      const data = await r.json();
+      return Array.isArray(data) ? data.slice(0,3).map(u=>({...u,symbol:ticker})) : [];
+    }));
+    const allUpgrades = upgradeResults.flat().sort((a,b)=>(b.gradeDate||'').localeCompare(a.gradeDate||'')).slice(0,10);
+    if (allUpgrades.length) {
+      sections.push(secHdr('⬆️ Upgrades & Downgrades'));
+      const rows = allUpgrades.map(u=>{
         const badge = (u.action||'').toLowerCase();
-        const badgeColor = badge.includes('upgrade') ? 'var(--green)' : badge.includes('downgrade') ? 'var(--red)' : 'var(--text3)';
+        const col = badge.includes('upgrade')?'var(--green)':badge.includes('downgrade')?'var(--red)':'var(--text3)';
         return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
-          <div style="min-width:50px;font-size:13px;font-weight:700;color:var(--text)">${u.symbol}</div>
+          <div style="min-width:44px;font-size:13px;font-weight:700;cursor:pointer" onclick="navigate('detail','${u.symbol}')">${u.symbol}</div>
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:600">${u.firm || 'Unknown Firm'}</div>
-            <div style="font-size:11px;color:var(--text3)">${u.fromGrade||'—'} → <span style="font-weight:600;color:${badgeColor}">${u.toGrade||'—'}</span></div>
+            <div style="font-size:12px;font-weight:600">${u.firm||'Unknown'}</div>
+            <div style="font-size:11px;color:var(--text3)">${u.fromGrade||'—'} → <span style="font-weight:600;color:${col}">${u.toGrade||'—'}</span></div>
           </div>
-          <div style="font-size:11px;color:var(--text3);white-space:nowrap">${u.gradeDate || ''}</div>
+          <div style="font-size:11px;color:var(--text3);white-space:nowrap">${u.gradeDate||''}</div>
         </div>`;
       }).join('');
-      sections.push(`<div class="news-section-title">⬆️ Upgrades & Downgrades</div>
-        <div style="margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">${rows}</div>`);
+      sections.push(cardWrap(rows));
     }
-  } catch(e) {}
+  } catch(e){}
 
-  // ── 13. STOCK-SPECIFIC NEWS ───────────────────────────────────
-  const stockNewsPromises = tickers.slice(0, 3).map(async ticker => {
+  // ── 7. MARKET HEADLINES ───────────────────────────────────
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${key}`);
+    const articles = await r.json();
+    if (Array.isArray(articles) && articles.length) {
+      sections.push(secHdr('🌍 Market Headlines'));
+      sections.push(`<div style="padding:0 16px 4px;display:flex;flex-direction:column;gap:8px">${articles.slice(0,6).map(newsCard).join('')}</div>`);
+    }
+  } catch(e){}
+
+  // ── 8. STOCK NEWS (2–3 per holding) ──────────────────────
+  const stockNewsResults = await Promise.all(tickers.map(async ticker => {
     try {
       const to   = new Date().toISOString().split('T')[0];
-      const from = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+      const from = new Date(Date.now()-14*86400000).toISOString().split('T')[0];
       const r = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${key}`);
       const articles = await r.json();
-      if (!Array.isArray(articles) || !articles.length) return null;
-      const top = articles.slice(0, 4);
-      return `<div class="news-section-title">📰 ${ticker} News</div>
-        <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 4px">
-          ${top.map(newsArticleCard).join('')}
-        </div>`;
-    } catch(e) { return null; }
-  });
-  const stockNewsResults = (await Promise.all(stockNewsPromises)).filter(Boolean);
-  sections.push(...stockNewsResults);
-
-  container.innerHTML = sections.length
-    ? sections.join('') + '<div style="height:16px"></div>'
-    : '<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">No data available. Check your API key in Settings.</div>';
-}
-
-async function refreshNewsTab() {
-  const container = document.getElementById('news-tab-container');
-  if (container) container.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:24px 16px;text-align:center">Refreshing…</div>`;
-  await renderNews();
-}
-
-// ─── Stock-page news ──────────────────────────────────────────────────────────
-async function renderStockNews(ticker) {
-  const el = document.getElementById('detail-stock-news');
-  if (!el) return;
-  const key = state.settings.apiKey;
-  if (!key) { el.innerHTML = '<div style="color:var(--text3);font-size:12px">Add API key in Settings to see news</div>'; return; }
-
-  try {
-    const to   = new Date().toISOString().split('T')[0];
-    const from = new Date(Date.now() - 14*86400000).toISOString().split('T')[0];
-    const r = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${key}`);
-    const articles = await r.json();
-    if (!Array.isArray(articles) || !articles.length) {
-      el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">No recent news found</div>';
-      return;
-    }
-    el.innerHTML = articles.slice(0, 10).map(newsArticleCard).join('');
-  } catch(e) {
-    el.innerHTML = '<div style="color:var(--text3);font-size:13px">Failed to load news</div>';
+      if (!Array.isArray(articles)||!articles.length) return null;
+      return { ticker, articles: articles.slice(0,3) };
+    } catch(e){ return null; }
+  }));
+  for (const item of stockNewsResults.filter(Boolean)) {
+    sections.push(secHdr(`📰 ${item.ticker} News`));
+    sections.push(`<div style="padding:0 16px 4px;display:flex;flex-direction:column;gap:8px">${item.articles.map(newsCard).join('')}</div>`);
   }
+
+  sections.push('<div style="height:16px"></div>');
+  container.innerHTML = sections.join('') || `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No data available — check API key in Settings</div>`;
 }
 
 function addTwitterAccount() {
@@ -4147,17 +3537,17 @@ function addTwitterAccount() {
   if (!handle) return;
   if (!/^[A-Za-z0-9_]{1,50}$/.test(handle)) { showToast('Invalid username', 'error'); return; }
   if (!state.settings.twitterAccounts) state.settings.twitterAccounts = [];
-  if (state.settings.twitterAccounts.map(h => h.toLowerCase()).includes(handle.toLowerCase())) {
-    showToast('@' + handle + ' already added', 'error'); return;
+  if (state.settings.twitterAccounts.map(h=>h.toLowerCase()).includes(handle.toLowerCase())) {
+    showToast('@'+handle+' already added', 'error'); return;
   }
   state.settings.twitterAccounts.push(handle);
   save(); input.value = '';
   renderTwitterAccountsList();
-  showToast('@' + handle + ' saved', 'success');
+  showToast('@'+handle+' saved', 'success');
 }
 
 function removeTwitterAccount(handle) {
-  state.settings.twitterAccounts = (state.settings.twitterAccounts || []).filter(h => h !== handle);
+  state.settings.twitterAccounts = (state.settings.twitterAccounts||[]).filter(h=>h!==handle);
   save(); renderTwitterAccountsList();
 }
 
@@ -4165,14 +3555,11 @@ function renderTwitterAccountsList() {
   const el = document.getElementById('twitter-accounts-list');
   if (!el) return;
   const accounts = state.settings.twitterAccounts || [];
-  if (!accounts.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No accounts saved</div>';
-    return;
-  }
-  el.innerHTML = accounts.map(h => `
+  if (!accounts.length) { el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No accounts added yet</div>'; return; }
+  el.innerHTML = accounts.map(handle => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:var(--radius-sm);padding:9px 12px">
-      <span style="font-size:13px;font-weight:500">@${h}</span>
-      <button onclick="removeTwitterAccount('${h}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:2px 6px;font-family:var(--font);font-weight:500">Remove</button>
+      <span style="font-size:13px;font-weight:500">@${handle}</span>
+      <button onclick="removeTwitterAccount('${handle}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:2px 6px;font-family:var(--font);font-weight:500">Remove</button>
     </div>`).join('');
 }
 
@@ -4760,18 +4147,15 @@ function init() {
     }
   });
 
-  // Redraw chart on resize
-  window.addEventListener('resize', () => {
-    if (chartData && currentDetailTicker && document.getElementById('screen-detail').classList.contains('active')) {
-      const cached = _chartCache[`${currentDetailTicker}_${chartPeriod}`];
-      drawChart(chartData, cached?.isOHLC ?? false, cached?.openPrice);
-    }
-  });
-
   // Tick every minute to keep "X minutes ago" label fresh
   setInterval(() => {
     if (document.getElementById('home-last-refresh')) renderRefreshBar();
   }, 60000);
+
+  // Auto-load news tab on startup (non-blocking, runs after prices)
+  if (state.settings.apiKey && state.transactions.length) {
+    setTimeout(() => renderNews(), 1500);
+  }
 }
 
 init();
